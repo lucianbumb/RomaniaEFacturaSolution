@@ -14,8 +14,8 @@
     <Product>Romania EFactura Library</Product>
     <Description>A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF. Supports OAuth2 authentication with digital certificates, UBL 2.1 XML invoice processing, and complete ANAF API integration for uploading, downloading, and managing invoices.</Description>
     <PackageTags>efactura;romania;anaf;spv;ubl;xml;invoice;oauth2;digital-certificate;accounting;fiscal;tax</PackageTags>
-    <PackageProjectUrl>https://github.com/your-username/RomaniaEFacturaLibrary</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/your-username/RomaniaEFacturaLibrary</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -23,7 +23,6 @@
     <Copyright>Copyright © 2025 Romania EFactura Library Contributors</Copyright>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
     <!-- Target Frameworks for broader compatibility -->
@@ -46,8 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\README.md" Pack="true" PackagePath="\" />
-    <None Include="icon.png" Pack="true" PackagePath="\" Condition="Exists('icon.png')" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

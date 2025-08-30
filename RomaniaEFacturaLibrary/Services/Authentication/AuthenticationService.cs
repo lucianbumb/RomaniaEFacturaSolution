@@ -60,7 +60,7 @@ public class AuthenticationService : IAuthenticationService
         // Load and configure the digital certificate
         if (!string.IsNullOrEmpty(_config.CertificatePath))
         {
-            var cert = X509CertificateLoader.LoadPkcs12FromFile(_config.CertificatePath, _config.CertificatePassword);
+            var cert = new X509Certificate2(_config.CertificatePath, _config.CertificatePassword);
             var handler = new HttpClientHandler();
             handler.ClientCertificates.Add(cert);
             
@@ -181,7 +181,7 @@ public class AuthenticationService : IAuthenticationService
             throw new FileNotFoundException($"Certificate file not found: {_config.CertificatePath}");
         }
 
-        return X509CertificateLoader.LoadPkcs12FromFile(_config.CertificatePath, _config.CertificatePassword);
+        return new X509Certificate2(_config.CertificatePath, _config.CertificatePassword);
     }
 
     private Dictionary<string, string> CreateAuthenticationRequest(X509Certificate2 certificate)
