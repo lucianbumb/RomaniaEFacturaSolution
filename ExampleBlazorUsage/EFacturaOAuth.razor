@@ -54,7 +54,7 @@
             </div>
             <div>
                 <h5>Processing authentication...</h5>
-                <p class="mb-0">Exchanging authorization code for access token...</p>
+                <p class="mb-0">Exchanging authorization code for JWT access token...</p>
             </div>
         </div>
     </div>
@@ -168,8 +168,6 @@
     private bool isLoadingInvoices = false;
     private List<InvoiceInfo>? invoices;
 
-    private readonly string redirectUri = "https://localhost:7000/efactura-oauth"; // Update with your actual URL
-
     protected override async Task OnInitializedAsync()
     {
         // Check if we're returning from OAuth callback
@@ -191,8 +189,8 @@
             errorMessage = null;
             StateHasChanged();
 
-            // Generate authorization URL
-            var authUrl = AuthService.GetAuthorizationUrl(redirectUri);
+            // Generate authorization URL using configuration
+            var authUrl = AuthService.GetAuthorizationUrl("efactura", Guid.NewGuid().ToString());
             
             Logger.LogInformation("Redirecting to authorization URL: {AuthUrl}", authUrl);
             
@@ -216,13 +214,20 @@
         {
             Logger.LogInformation("Processing OAuth callback with code: {Code}", code[..8] + "...");
             
-            // Exchange authorization code for access token
-            var tokenResponse = await AuthService.ExchangeCodeForTokenAsync(code, redirectUri);
+            // Exchange authorization code for JWT access token using Basic Auth
+            var tokenResponse = await AuthService.ExchangeCodeForTokenAsync(code);
             
-            tokenExpiry = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn ?? 3600);
-            currentStep = AuthStep.Authenticated;
-            
-            Logger.LogInformation("Authentication successful, token expires at {Expiry}", tokenExpiry);
+            if (tokenResponse != null)
+            {
+                tokenExpiry = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn ?? 3600);
+                currentStep = AuthStep.Authenticated;
+                
+                Logger.LogInformation("Authentication successful, JWT token expires at {Expiry}", tokenExpiry);
+            }
+            else
+            {
+                throw new Exception("Token response was null");
+            }
         }
         catch (Exception ex)
         {
@@ -241,8 +246,8 @@
         {
             errorMessage = null;
             
-            // Get current token and refresh it
-            await AuthService.GetAccessTokenAsync(); // This will auto-refresh if needed
+            // Get current token and refresh it using the refresh token
+            await AuthService.GetValidAccessTokenAsync(); // This will auto-refresh if needed
             
             tokenExpiry = DateTime.UtcNow.AddSeconds(3600); // Update expiry estimate
             
@@ -266,7 +271,7 @@
             errorMessage = null;
             StateHasChanged();
 
-            // Load invoices using the authenticated client
+            // Load invoices using the authenticated client with JWT token
             var invoiceList = await EFacturaClient.GetInvoicesAsync();
             
             invoices = invoiceList.Select(inv => new InvoiceInfo
@@ -348,11 +353,4 @@
 <script>
     window.downloadFile = (filename, content) => {
         const element = document.createElement('a');
-        element.setAttribute('href', 'data:application/xml;base64,' + content);
-        element.setAttribute('download', filename);
-        element.style.display = 'none';
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
-    };
-</script>
+        element.setAttribute('href', 'data:application/xml;base4

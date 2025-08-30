@@ -107,8 +107,8 @@ public class EFacturaApiClient : IEFacturaApiClient
     {
         _logger.LogInformation("Uploading invoice to SPV");
         
-        // Get access token
-        var token = await _authService.GetAccessTokenAsync(cancellationToken);
+        // Get access token using the new authentication service
+        var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
         // Prepare request
         var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.BaseUrl}/upload?standard=UBL&cif={_config.Cif}");
@@ -136,7 +136,7 @@ public class EFacturaApiClient : IEFacturaApiClient
     {
         _logger.LogInformation("Getting upload status for ID: {UploadId}", uploadId);
         
-        var token = await _authService.GetAccessTokenAsync(cancellationToken);
+        var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
         var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/stareMesaj?id_incarcare={uploadId}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -161,7 +161,7 @@ public class EFacturaApiClient : IEFacturaApiClient
     {
         _logger.LogInformation("Getting messages list");
         
-        var token = await _authService.GetAccessTokenAsync(cancellationToken);
+        var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
         var url = $"{_config.BaseUrl}/listaMesajeFactura?cif={_config.Cif}";
         if (from.HasValue)
@@ -192,7 +192,7 @@ public class EFacturaApiClient : IEFacturaApiClient
     {
         _logger.LogInformation("Downloading invoice with ID: {MessageId}", messageId);
         
-        var token = await _authService.GetAccessTokenAsync(cancellationToken);
+        var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
         var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/descarcare?id={messageId}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

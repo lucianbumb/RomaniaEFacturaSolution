@@ -29,7 +29,22 @@ public class EFacturaConfig
     public EFacturaEnvironment Environment { get; set; } = EFacturaEnvironment.Test;
     
     /// <summary>
-    /// Company fiscal identification code (CIF) - used as client_id in OAuth2
+    /// The Client ID obtained from ANAF application registration
+    /// </summary>
+    public string ClientId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// The Client Secret obtained from ANAF application registration
+    /// </summary>
+    public string ClientSecret { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// The Redirect URI registered with ANAF, where the authorization code will be sent
+    /// </summary>
+    public string RedirectUri { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Company fiscal identification code (CIF) - for legacy compatibility
     /// </summary>
     public string Cif { get; set; } = string.Empty;
     
@@ -41,14 +56,19 @@ public class EFacturaConfig
         : "https://api.anaf.ro/prod/FCTEL/rest";
     
     /// <summary>
+    /// OAuth Base URL for ANAF authentication
+    /// </summary>
+    public string OAuthBaseUrl => "https://logincert.anaf.ro/anaf-oauth2/v1/";
+    
+    /// <summary>
     /// OAuth Authorization URL for redirecting users to ANAF login
     /// </summary>
-    public string AuthorizeUrl => "https://logincert.anaf.ro/anaf-oauth2/v1/authorize";
+    public string AuthorizeUrl => OAuthBaseUrl + "authorize";
     
     /// <summary>
     /// Token URL for exchanging authorization codes and refreshing tokens
     /// </summary>
-    public string TokenUrl => "https://logincert.anaf.ro/anaf-oauth2/v1/token";
+    public string TokenUrl => OAuthBaseUrl + "token";
         
     /// <summary>
     /// Request timeout in seconds
