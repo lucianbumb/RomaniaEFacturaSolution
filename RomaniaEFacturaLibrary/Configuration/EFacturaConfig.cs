@@ -29,22 +29,7 @@ public class EFacturaConfig
     public EFacturaEnvironment Environment { get; set; } = EFacturaEnvironment.Test;
     
     /// <summary>
-    /// Certificate selection mode
-    /// </summary>
-    public CertificateSelectionMode CertificateMode { get; set; } = CertificateSelectionMode.AutoDetect;
-    
-    /// <summary>
-    /// Path to the digital certificate file (.pfx) - only used when CertificateMode is FilePath
-    /// </summary>
-    public string CertificatePath { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Password for the digital certificate - only used when CertificateMode is FilePath
-    /// </summary>
-    public string CertificatePassword { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Company fiscal identification code (CIF)
+    /// Company fiscal identification code (CIF) - used as client_id in OAuth2
     /// </summary>
     public string Cif { get; set; } = string.Empty;
     
@@ -56,18 +41,14 @@ public class EFacturaConfig
         : "https://api.anaf.ro/prod/FCTEL/rest";
     
     /// <summary>
-    /// OAuth URL for authentication
+    /// OAuth Authorization URL for redirecting users to ANAF login
     /// </summary>
-    public string OAuthUrl => Environment == EFacturaEnvironment.Test 
-        ? "https://logincert.anaf.ro/anaf-oauth2/v1/authorize" 
-        : "https://logincert.anaf.ro/anaf-oauth2/v1/authorize";
+    public string AuthorizeUrl => "https://logincert.anaf.ro/anaf-oauth2/v1/authorize";
     
     /// <summary>
-    /// Token URL for getting access tokens
+    /// Token URL for exchanging authorization codes and refreshing tokens
     /// </summary>
-    public string TokenUrl => Environment == EFacturaEnvironment.Test 
-        ? "https://logincert.anaf.ro/anaf-oauth2/v1/token" 
-        : "https://logincert.anaf.ro/anaf-oauth2/v1/token";
+    public string TokenUrl => "https://logincert.anaf.ro/anaf-oauth2/v1/token";
         
     /// <summary>
     /// Request timeout in seconds

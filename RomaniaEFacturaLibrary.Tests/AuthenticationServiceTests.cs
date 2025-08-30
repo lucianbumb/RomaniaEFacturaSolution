@@ -26,8 +26,6 @@ public class AuthenticationServiceTests
         _config = Options.Create(new EFacturaConfig
         {
             Environment = EFacturaEnvironment.Test,
-            CertificatePath = "", // No certificate for unit tests
-            CertificatePassword = "",
             Cif = "12345678",
             TimeoutSeconds = 30
         });
@@ -50,7 +48,7 @@ public class AuthenticationServiceTests
 
         // Assert
         Assert.That(config.BaseUrl, Does.Contain("test"));
-        Assert.That(config.OAuthUrl, Is.Not.Null);
+        Assert.That(config.AuthorizeUrl, Is.Not.Null);
         Assert.That(config.TokenUrl, Is.Not.Null);
     }
 
@@ -62,8 +60,35 @@ public class AuthenticationServiceTests
 
         // Assert
         Assert.That(config.BaseUrl, Does.Contain("prod"));
-        Assert.That(config.OAuthUrl, Is.Not.Null);
+        Assert.That(config.AuthorizeUrl, Is.Not.Null);
         Assert.That(config.TokenUrl, Is.Not.Null);
+    }
+
+    [Test]
+    public void GetAuthorizationUrl_ValidParameters_ReturnsCorrectUrl()
+    {
+        // Arrange
+        var redirectUri = "https://localhost:5000/callback";
+        var state = "test-state";
+
+        // Act
+        var authUrl = _authService.GetAuthorizationUrl(redirectUri, state);
+
+        // Assert
+        Assert.That(authUrl, Does.Contain("logincert.anaf.ro"));
+        Assert.That(authUrl, Does.Contain("response_type=code"));
+        Assert.That(authUrl, Does.Contain("client_id=12345678"));
+        Assert.That(authUrl, Does.Contain($"redirect_uri={Uri.EscapeDataString(redirectUri)}"));
+        Assert.That(authUrl, Does.Contain($"state={state}"));
+        Assert.That(authUrl, Does.Contain("scope=eFACTURA"));
+    }
+
+    [Test]
+    public void GetAccessTokenAsync_NoToken_ThrowsAuthenticationException()
+    {
+        // Act & Assert
+        Assert.ThrowsAsync<AuthenticationException>(
+            async () => await _authService.GetAccessTokenAsync());
     }
 
     [Test]
@@ -94,5 +119,25 @@ public class AuthenticationServiceTests
 
         // Assert
         Assert.That(token.IsValid, Is.False);
+    }
+
+    [Test]
+    public async Task GetAccessTokenAsync_ValidToken_ReturnsToken()
+    {
+        // Arrange
+        var token = new TokenResponse
+        {
+            AccessToken = "valid-token",
+            ExpiresIn = 3600,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        _authService.SetToken(token);
+
+        // Act
+        var accessToken = await _authService.GetAccessTokenAsync();
+
+        // Assert
+        Assert.That(accessToken, Is.EqualTo("valid-token"));
     }
 }
