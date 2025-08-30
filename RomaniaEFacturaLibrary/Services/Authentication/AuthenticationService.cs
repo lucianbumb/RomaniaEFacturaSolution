@@ -11,6 +11,27 @@ using System.Text.Json;
 namespace RomaniaEFacturaLibrary.Services.Authentication;
 
 /// <summary>
+/// Certificate selection mode
+/// </summary>
+public enum CertificateSelectionMode
+{
+    /// <summary>
+    /// Load from file path (original behavior)
+    /// </summary>
+    FilePath,
+    
+    /// <summary>
+    /// Select from certificate store (allows USB certificates)
+    /// </summary>
+    CertificateStore,
+    
+    /// <summary>
+    /// Automatic detection - prefer USB, fallback to file
+    /// </summary>
+    AutoDetect
+}
+
+/// <summary>
 /// Service for handling OAuth2 authentication with ANAF using digital certificates
 /// </summary>
 public interface IAuthenticationService
@@ -29,6 +50,16 @@ public interface IAuthenticationService
     /// Refreshes an existing token
     /// </summary>
     Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Gets available certificates for the specified CIF
+    /// </summary>
+    List<X509Certificate2> GetAvailableCertificates(string? cif = null);
+    
+    /// <summary>
+    /// Sets the certificate to use for authentication
+    /// </summary>
+    void SetCertificate(X509Certificate2 certificate);
 }
 
 public class AuthenticationService : IAuthenticationService
@@ -38,6 +69,7 @@ public class AuthenticationService : IAuthenticationService
     private readonly ILogger<AuthenticationService> _logger;
     private TokenResponse? _currentToken;
     private readonly SemaphoreSlim _tokenSemaphore = new(1, 1);
+    private X509Certificate2? _selectedCertificate;
 
     public AuthenticationService(
         HttpClient httpClient,
@@ -66,6 +98,50 @@ public class AuthenticationService : IAuthenticationService
             
             _logger.LogInformation("Certificate loaded: {Subject}", cert.Subject);
         }
+    }
+
+    public List<X509Certificate2> GetAvailableCertificates(string? cif = null)
+    {
+        var certificates = new List<X509Certificate2>();
+        
+        try
+        {
+            // Search in Current User Personal store (includes USB certificates)
+            using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+            store.Open(OpenFlags.ReadOnly);
+            
+            foreach (var cert in store.Certificates)
+            {
+                // Check if certificate has private key and is valid
+                if (cert.HasPrivateKey && 
+                    cert.NotBefore <= DateTime.Now && 
+                    cert.NotAfter >= DateTime.Now)
+                {
+                    // If CIF is provided, filter by certificate subject or issuer
+                    if (string.IsNullOrEmpty(cif) || 
+                        cert.Subject.Contains(cif) || 
+                        cert.GetNameInfo(X509NameType.SimpleName, false).Contains(cif))
+                    {
+                        certificates.Add(cert);
+                    }
+                }
+            }
+            
+            _logger.LogInformation("Found {Count} valid certificates", certificates.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accessing certificate store");
+        }
+        
+        return certificates;
+    }
+    
+    public void SetCertificate(X509Certificate2 certificate)
+    {
+        _selectedCertificate = certificate;
+        _currentToken = null; // Reset token when certificate changes
+        _logger.LogInformation("Certificate set: {Subject}", certificate.Subject);
     }
 
     public async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default)
@@ -171,17 +247,40 @@ public class AuthenticationService : IAuthenticationService
 
     private X509Certificate2 LoadCertificate()
     {
-        if (string.IsNullOrEmpty(_config.CertificatePath))
+        // Priority 1: Use explicitly set certificate
+        if (_selectedCertificate != null)
         {
-            throw new InvalidOperationException("Certificate path is not configured");
+            _logger.LogInformation("Using explicitly set certificate");
+            return _selectedCertificate;
         }
-
-        if (!File.Exists(_config.CertificatePath))
+        
+        // Priority 2: Auto-detect USB certificates
+        var availableCertificates = GetAvailableCertificates(_config.Cif);
+        if (availableCertificates.Count == 1)
         {
-            throw new FileNotFoundException($"Certificate file not found: {_config.CertificatePath}");
+            _logger.LogInformation("Auto-selected single available certificate");
+            return availableCertificates[0];
         }
-
-        return LoadCertificateSecure(_config.CertificatePath, _config.CertificatePassword);
+        else if (availableCertificates.Count > 1)
+        {
+            // Multiple certificates found - in a real scenario, you'd want to prompt user
+            _logger.LogWarning("Multiple certificates found. Using first one. Consider implementing certificate selection UI.");
+            return availableCertificates[0];
+        }
+        
+        // Priority 3: Fallback to file path if configured
+        if (!string.IsNullOrEmpty(_config.CertificatePath))
+        {
+            if (!File.Exists(_config.CertificatePath))
+            {
+                throw new FileNotFoundException($"Certificate file not found: {_config.CertificatePath}");
+            }
+            
+            _logger.LogInformation("Using certificate from file path");
+            return LoadCertificateSecure(_config.CertificatePath, _config.CertificatePassword);
+        }
+        
+        throw new InvalidOperationException("No certificate available. Please insert USB certificate or configure certificate path.");
     }
 
     private static X509Certificate2 LoadCertificateSecure(string certificatePath, string? certificatePassword)

@@ -1,3 +1,5 @@
+using RomaniaEFacturaLibrary.Services.Authentication;
+
 namespace RomaniaEFacturaLibrary.Configuration;
 
 /// <summary>
@@ -27,12 +29,17 @@ public class EFacturaConfig
     public EFacturaEnvironment Environment { get; set; } = EFacturaEnvironment.Test;
     
     /// <summary>
-    /// Path to the digital certificate file (.pfx)
+    /// Certificate selection mode
+    /// </summary>
+    public CertificateSelectionMode CertificateMode { get; set; } = CertificateSelectionMode.AutoDetect;
+    
+    /// <summary>
+    /// Path to the digital certificate file (.pfx) - only used when CertificateMode is FilePath
     /// </summary>
     public string CertificatePath { get; set; } = string.Empty;
     
     /// <summary>
-    /// Password for the digital certificate
+    /// Password for the digital certificate - only used when CertificateMode is FilePath
     /// </summary>
     public string CertificatePassword { get; set; } = string.Empty;
     
