@@ -24,6 +24,9 @@
     <FileVersion>1.0.0.0</FileVersion>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
+    <!-- Local NuGet package output directory -->
+    <PackageOutputPath>D:\Nuget\LocalTools</PackageOutputPath>
+    
     <!-- Target Frameworks for broader compatibility -->
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
   </PropertyGroup>
