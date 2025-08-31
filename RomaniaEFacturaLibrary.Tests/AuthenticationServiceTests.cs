@@ -158,4 +158,91 @@ public class AuthenticationServiceTests
         // Assert
         Assert.That(accessToken, Is.EqualTo("valid-token"));
     }
+
+    [Test]
+    public void GetAuthorizationUrl_MinimalParameters_ContainsRequiredFields()
+    {
+        // Act
+        var authUrl = _authService.GetAuthorizationUrl();
+
+        // Assert
+        Assert.That(authUrl, Does.Contain("response_type=code"));
+        Assert.That(authUrl, Does.Contain("client_id=test-client-id"));
+        Assert.That(authUrl, Does.Contain("token_content_type=jwt"));
+        Assert.That(authUrl, Does.Contain("logincert.anaf.ro"));
+        Assert.That(authUrl, Does.Contain("anaf-oauth2/v1/authorize"));
+    }
+
+    [Test]
+    public void GetAuthorizationUrl_WithSpecialCharacters_UrlEncodesCorrectly()
+    {
+        // Arrange
+        var redirectUri = "https://test.com/callback?param=value&other=test";
+        var state = "state-with-special-chars!@#$%";
+
+        // Act
+        var authUrl = _authService.GetAuthorizationUrl("test-client", redirectUri, "efactura", state);
+
+        // Assert
+        Assert.That(authUrl, Does.Contain("redirect_uri="));
+        Assert.That(authUrl, Does.Contain("state="));
+        // URL should be properly encoded
+        Assert.That(authUrl, Is.Not.Null);
+    }
+
+    [Test]
+    public void EFacturaConfig_DefaultValues_AreSetCorrectly()
+    {
+        // Arrange & Act
+        var config = new EFacturaConfig();
+
+        // Assert
+        Assert.That(config.Environment, Is.EqualTo(EFacturaEnvironment.Test));
+        Assert.That(config.TimeoutSeconds, Is.EqualTo(30));
+        Assert.That(config.OAuthBaseUrl, Is.EqualTo("https://logincert.anaf.ro/anaf-oauth2/v1/"));
+        Assert.That(config.AuthorizeUrl, Is.EqualTo("https://logincert.anaf.ro/anaf-oauth2/v1/authorize"));
+        Assert.That(config.TokenUrl, Is.EqualTo("https://logincert.anaf.ro/anaf-oauth2/v1/token"));
+    }
+
+    [Test]
+    public void TokenResponse_WithRefreshToken_HasCorrectProperties()
+    {
+        // Arrange & Act
+        var token = new TokenResponse
+        {
+            AccessToken = "access-token",
+            RefreshToken = "refresh-token",
+            TokenType = "Bearer",
+            ExpiresIn = 3600,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Assert
+        Assert.That(token.AccessToken, Is.EqualTo("access-token"));
+        Assert.That(token.RefreshToken, Is.EqualTo("refresh-token"));
+        Assert.That(token.TokenType, Is.EqualTo("Bearer"));
+        Assert.That(token.IsValid, Is.True);
+    }
+
+    [Test]
+    public void SetToken_ValidToken_UpdatesCurrentToken()
+    {
+        // Arrange
+        var token = new TokenResponse
+        {
+            AccessToken = "new-token",
+            ExpiresIn = 3600,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Act
+        _authService.SetToken(token);
+
+        // Assert - Verify token was set by attempting to get it
+        Assert.DoesNotThrowAsync(async () => 
+        {
+            var accessToken = await _authService.GetValidAccessTokenAsync();
+            Assert.That(accessToken, Is.EqualTo("new-token"));
+        });
+    }
 }

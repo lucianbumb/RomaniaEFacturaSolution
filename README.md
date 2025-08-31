@@ -22,7 +22,7 @@ This library provides a complete solution for:
 
 - **`RomaniaEFacturaLibrary/`** - Main library with all EFactura functionality
 - **`RomaniaEFacturaConsole/`** - Interactive console application for testing
-- **`RomaniaEFacturaLibrary.Tests/`** - Comprehensive unit test suite (24 tests)
+- **`RomaniaEFacturaLibrary.Tests/`** - Comprehensive unit test suite (29 tests)
 - **`ExampleBlazorUsage/`** - Example Blazor application implementation
 - **`documentation_efactura/`** - Official ANAF documentation and guides
 - **Documentation Files**:
@@ -191,7 +191,7 @@ dotnet run
 ## Build Status
 
 ✅ **Solution builds successfully**  
-✅ **All 24 unit tests pass**  
+✅ **All 29 unit tests pass**  
 ✅ **Release configuration ready**  
 ✅ **Multi-target support** (.NET 8.0 and .NET 9.0)  
 ✅ **NuGet package ready**
