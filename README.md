@@ -213,8 +213,8 @@ public class InvoiceController : ControllerBase
     public async Task<IActionResult> ValidateInvoice([FromBody] ValidateRequest request)
     {
         var result = await _eFacturaClient.ValidateInvoiceAsync(
-            invoice: request.Invoice,
-            cif: request.Cif  // CIF now required as parameter
+            cif: request.Cif,  // CIF now required as parameter
+            xmlContent: request.XmlContent
         );
         
         return Ok(result);
@@ -224,21 +224,19 @@ public class InvoiceController : ControllerBase
     public async Task<IActionResult> UploadInvoice([FromBody] UploadRequest request)
     {
         var result = await _eFacturaClient.UploadInvoiceAsync(
-            invoice: request.Invoice,
             cif: request.Cif,
-            environment: "prod"  // Optional: "test" or "prod"
+            xmlContent: request.XmlContent
         );
         
         return Ok(result);
     }
     
-    [HttpGet("messages")]
-    public async Task<IActionResult> GetMessages([FromQuery] string cif)
+    [HttpGet("list")]
+    public async Task<IActionResult> GetInvoices([FromQuery] string cif, [FromQuery] int days = 30)
     {
         var messages = await _eFacturaClient.GetInvoicesAsync(
             cif: cif,
-            from: DateTime.UtcNow.AddDays(-30),
-            to: DateTime.UtcNow
+            days: days
         );
         
         return Ok(messages);
@@ -254,71 +252,26 @@ public class InvoiceController : ControllerBase
     [HttpGet("download/{messageId}/pdf")]
     public async Task<IActionResult> DownloadPdf(string messageId)
     {
-        var invoice = await _eFacturaClient.DownloadInvoiceAsync(messageId);
-        var pdfData = await _eFacturaClient.ConvertToPdfAsync(invoice);
-        
-        return File(pdfData, "application/pdf", $"invoice_{messageId}.pdf");
+        var pdfBytes = await _eFacturaClient.DownloadInvoicePdfAsync(messageId);
+        return File(pdfBytes, "application/pdf", $"invoice_{messageId}.pdf");
+    }
+    
+    [HttpGet("messages")]
+    public async Task<IActionResult> GetMessages([FromQuery] string cif, [FromQuery] int days = 30)
+    {
+        var messages = await _eFacturaClient.GetMessagesAsync(cif, days);
+        return Ok(messages);
     }
 }
 ```
 
-```csharp
-public class AuthController : ControllerBase
-{
-    private readonly IAuthenticationService _authService;
+## 📚 Complete Examples
 
-    public AuthController(IAuthenticationService authService)
-    {
-        _authService = authService;
-    }
+For comprehensive examples, see the [Examples/Controllers](Examples/Controllers/) directory:
 
-    [HttpGet("login")]
-    public IActionResult Login()
-    {
-        // Step 1: Get authorization URL for ANAF OAuth
-        var authUrl = _authService.GetAuthorizationUrl("efactura", "unique-state");
-        return Redirect(authUrl);
-    }
-
-    [HttpGet("callback")]
-    public async Task<IActionResult> Callback(string code, string state)
-    {
-        // Step 2: Exchange authorization code for access token
-        var token = await _authService.ExchangeCodeForTokenAsync(code);
-        if (token != null)
-        {
-            // Store token securely (session, database, etc.)
-            _authService.SetToken(token);
-            return Ok("Authentication successful");
-        }
-        
-        return BadRequest("Authentication failed");
-    }
-}
-
-public class InvoiceController : ControllerBase
-{
-    private readonly IEFacturaClient _eFacturaClient;
-
-    public InvoiceController(IEFacturaClient eFacturaClient)
-    {
-        _eFacturaClient = eFacturaClient;
-    }
-
-    [HttpPost("upload")]
-    public async Task<IActionResult> UploadInvoice([FromBody] UblInvoice invoice)
-    {
-        // Upload to ANAF (token will be automatically used)
-        var result = await _eFacturaClient.UploadInvoiceAsync(invoice);
-        if (result.IsSuccess)
-        {
-            return Ok(new { UploadId = result.UploadId });
-        }
-
-        return BadRequest(result.Errors);
-    }
-}
-```
+- **[AuthenticationController.cs](Examples/Controllers/AuthenticationController.cs)** - Complete OAuth2 flow implementation
+- **[InvoiceController.cs](Examples/Controllers/InvoiceController.cs)** - Invoice validation and upload examples  
+- **[InvoiceManagementController.cs](Examples/Controllers/InvoiceManagementController.cs)** - Download, search, and management examples
 
 ## Testing
 
@@ -361,7 +314,7 @@ dotnet run
 
 - **GitHub Repository**: [https://github.com/lucianbumb/RomaniaEFacturaSolution](https://github.com/lucianbumb/RomaniaEFacturaSolution)
 - **Package ID**: `RomaniaEFacturaLibrary`
-- **Current Version**: `1.0.0`
+- **Current Version**: `2.0.0`
 - **License**: MIT
 
 ## Contributing

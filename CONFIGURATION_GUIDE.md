@@ -1,6 +1,13 @@
-# Romania EFactura Library - Configuration Reference
+# Romania EFactura Library - Configuration Reference v2.0.0
 
-This document provides a complete reference for all configuration options available in the Romania EFactura Library.
+This document provides a complete reference for all configuration options available in the Romania EFactura Library v2.0.0.
+
+## 🆕 What's New in v2.0.0
+
+- **🔄 Flexible Token Storage**: Choose between MemoryCache, Cookie, or custom storage
+- **📝 CIF as Parameters**: CIF is now passed as method parameters instead of configuration
+- **🛡️ Enhanced Security**: Secure cookie options and automatic token cleanup
+- **🔧 Better API Design**: Internal API client, cleaner public interface
 
 ## Configuration Schema
 

@@ -1,39 +1,74 @@
-# Romania EFactura Library - Project Summary
+# Romania EFactura Library - Project Summary v2.0.0
 
 ## 📦 What's Been Created
 
-A complete, production-ready C# library for Romanian EFactura (SPV) integration with comprehensive documentation and testing.
+A complete, production-ready C# library for Romanian EFactura (SPV) integration with comprehensive documentation, testing, and v2.0.0 enhancements including flexible token storage and improved API design.
+
+## 🚀 What's New in v2.0.0
+
+### 🔄 Flexible Token Storage System
+- **MemoryCache Storage**: Fast, server-side token caching
+- **Cookie Storage**: Persistent, browser-based token storage  
+- **Custom Storage**: Extensible interface for database/Redis implementations
+- **Automatic Token Management**: No manual token handling required
+
+### 📝 CIF Parameter Enhancement
+- **Method-level CIF**: CIF passed as parameters instead of configuration
+- **Multi-company Support**: Same client instance works with multiple companies
+- **Better Flexibility**: No client reconfiguration needed
+
+### 🛡️ Enhanced Architecture
+- **Internal API Client**: `EFacturaApiClient` made internal for better encapsulation
+- **Clean Public Interface**: Only `IEFacturaClient` exposed for dependency injection
+- **Improved Separation**: Clear distinction between public API and internal implementation
+
+### 📚 Comprehensive Examples
+- **AuthenticationController**: Complete OAuth2 flow implementation
+- **InvoiceController**: Invoice validation and upload examples
+- **InvoiceManagementController**: Download, search, and management operations
+- **Production-Ready**: All examples include proper error handling and validation
 
 ### 🏗️ Repository Structure
 ```
 RomaniaEFacturaSolution/
-├── RomaniaEFacturaLibrary/           # Main library (NuGet package)
-├── RomaniaEFacturaConsole/           # Interactive test application
-├── RomaniaEFacturaLibrary.Tests/    # Unit tests (24 tests, all passing)
-├── ExampleBlazorUsage/              # Blazor example implementation
-├── documentation_efactura/          # Official ANAF documentation
-├── README.md                        # Main documentation
-├── IMPLEMENTATION_GUIDE.md          # Step-by-step setup guide
-├── CONFIGURATION_GUIDE.md           # Complete configuration reference
-├── PUBLISHING_GUIDE.md              # NuGet publishing instructions
-└── PROJECT_SUMMARY.md               # This file
+├── RomaniaEFacturaLibrary/           # Main library (NuGet package v2.0.0)
+│   ├── Services/TokenStorage/       # New: Flexible token storage implementations
+│   ├── Services/Api/               # Internal API client (now internal)
+│   ├── Services/                   # Public EFactura client and services
+│   └── Models/Authentication/      # New: Token management models
+├── Examples/Controllers/            # New: Complete controller examples
+│   ├── AuthenticationController.cs # OAuth2 authentication flow
+│   ├── InvoiceController.cs        # Invoice validation and upload
+│   └── InvoiceManagementController.cs # Download and management
+├── RomaniaEFacturaLibrary.Tests/   # Enhanced test suite with v2.0.0 coverage
+│   ├── TokenStorage/               # New: Token storage service tests
+│   └── Services/                   # Updated client and service tests
+├── RomaniaEFacturaConsole/         # Updated console application
+├── documentation_efactura/         # Official ANAF documentation
+├── README.md                       # Updated with v2.0.0 features
+├── IMPLEMENTATION_GUIDE.md         # Enhanced setup guide
+├── CONFIGURATION_GUIDE.md          # Updated configuration reference
+├── PUBLISHING_GUIDE.md             # Updated publishing instructions
+├── TokenStorageGuide.md            # New: Complete token management guide
+├── RELEASE_NOTES_v2.0.0.md         # New: Detailed release notes
+└── PROJECT_SUMMARY.md              # This file (updated for v2.0.0)
 ```
 
 ### 🚀 Ready for NuGet Publishing
 
 ✅ **Package Configuration Complete**
 - Package ID: `RomaniaEFacturaLibrary`
-- Version: `1.0.0`
-- Target Frameworks: `.NET 8.0` and `.NET 9.0`
+- Version: `2.0.0`
+- Target Frameworks: `.NET 9.0`
 - Complete metadata and dependencies
 - Repository: `https://github.com/lucianbumb/RomaniaEFacturaSolution`
-- Generated package: `RomaniaEFacturaLibrary.1.0.0.nupkg`
+- Generated package: `RomaniaEFacturaLibrary.2.0.0.nupkg`
 
 ✅ **Quality Verified**
-- All 29 unit tests passing
+- All unit tests passing (comprehensive test coverage)
 - Release build successful
 - No compiler warnings
-- Complete test coverage
+- Complete test coverage with v2.0.0 features
 
 ## 🔧 Core Features Implemented
 
@@ -204,7 +239,7 @@ RomaniaEFacturaSolution/
 2. **Get API key** from nuget.org
 3. **Publish package**:
    ```bash
-   dotnet nuget push bin\Release\RomaniaEFacturaLibrary.1.0.0.nupkg --api-key YOUR_KEY --source https://api.nuget.org/v3/index.json
+   dotnet nuget push bin\Release\RomaniaEFacturaLibrary.2.0.0.nupkg --api-key YOUR_KEY --source https://api.nuget.org/v3/index.json
    ```
 4. **Share with Romanian developer community**
 
