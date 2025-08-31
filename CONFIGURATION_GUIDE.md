@@ -12,13 +12,9 @@ The main configuration section in `appsettings.json`:
 {
   "EFactura": {
     "Environment": "Test",                    // "Test" or "Production"
-    "CertificatePath": "",                   // Path to .pfx certificate file
-    "CertificatePassword": "",               // Password for .pfx file
-    "CertificateThumbprint": "",             // Certificate thumbprint (alternative to file)
-    "CertificateStoreName": "My",            // Certificate store name (default: "My")
-    "CertificateStoreLocation": "CurrentUser", // Store location (default: "CurrentUser")
-    "CertificateSubject": "",                // Certificate subject (alternative identifier)
-    "Cif": "",                               // Your company's CIF (required)
+    "ClientId": "",                          // Your ANAF application Client ID
+    "ClientSecret": "",                      // Your ANAF application Client Secret
+    "RedirectUri": "",                       // Registered OAuth callback URL
     "TimeoutSeconds": 30                     // HTTP timeout in seconds
   }
 }
@@ -33,62 +29,58 @@ The main configuration section in `appsettings.json`:
 | `Test` | Development/Testing environment | `https://api.anaf.ro/test/FCTEL/rest` |
 | `Production` | Live production environment | `https://api.anaf.ro/prod/FCTEL/rest` |
 
-### Certificate Configuration Options
+### OAuth2 Authentication Configuration
 
-Choose **ONE** of the following certificate configuration methods:
-
-#### Option 1: Certificate File (.pfx)
-```json
-{
-  "CertificatePath": "Certificates/certificate.pfx",
-  "CertificatePassword": "your-password"
-}
-```
-
-#### Option 2: Certificate Thumbprint (USB Token/Smart Card)
-```json
-{
-  "CertificateThumbprint": "ABC123DEF456789...",
-  "CertificateStoreName": "My",
-  "CertificateStoreLocation": "CurrentUser"
-}
-```
-
-#### Option 3: Certificate Subject
-```json
-{
-  "CertificateSubject": "CN=Your Company Name, O=Your Organization",
-  "CertificateStoreName": "My",
-  "CertificateStoreLocation": "CurrentUser"
-}
-```
-
-### Certificate Store Locations
-
-| Value | Description |
-|-------|-------------|
-| `CurrentUser` | Certificate store for current user (default) |
-| `LocalMachine` | System-wide certificate store |
-
-### Certificate Store Names
-
-| Value | Description |
-|-------|-------------|
-| `My` | Personal certificate store (default) |
-| `Root` | Trusted root certificate store |
-| `CA` | Intermediate certificate authorities |
-
-### Company Information
+#### Required Parameters
 
 | Parameter | Description | Format | Required |
 |-----------|-------------|---------|----------|
-| `Cif` | Romanian Fiscal Identification Code | Numbers only (e.g., "12345678") | ✅ Yes |
+| `ClientId` | Client ID from ANAF application registration | String | ✅ Yes |
+| `ClientSecret` | Client Secret from ANAF application registration | String | ✅ Yes |
+| `RedirectUri` | OAuth callback URL registered with ANAF | Valid URL | ✅ Yes |
+
+#### Example Configuration
+```json
+{
+  "EFactura": {
+    "Environment": "Test",
+    "ClientId": "your-anaf-client-id",
+    "ClientSecret": "your-anaf-client-secret",
+    "RedirectUri": "https://yourapp.com/auth/callback"
+  }
+}
+```
 
 ### Timeout Settings
 
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|
 | `TimeoutSeconds` | HTTP request timeout | 30 | 5-300 seconds |
+
+## OAuth2 Authentication Flow
+
+The library implements the OAuth2 Authorization Code Flow with ANAF:
+
+### Step 1: Authorization URL Generation
+```csharp
+// Generate URL to redirect user to ANAF for authentication
+var authUrl = authService.GetAuthorizationUrl("efactura", "unique-state");
+// User is redirected to: https://logincert.anaf.ro/anaf-oauth2/v1/authorize?...
+```
+
+### Step 2: Authorization Code Exchange  
+```csharp
+// After user authenticates, ANAF redirects back with authorization code
+var token = await authService.ExchangeCodeForTokenAsync(authorizationCode);
+// Library exchanges code for access_token and refresh_token
+```
+
+### Step 3: Token Usage
+```csharp
+// Library automatically uses access_token for API calls
+var result = await eFacturaClient.UploadInvoiceAsync(invoice);
+// If token expires, library automatically refreshes using refresh_token
+```
 
 ## Environment-Specific Configurations
 
@@ -98,9 +90,9 @@ Choose **ONE** of the following certificate configuration methods:
 {
   "EFactura": {
     "Environment": "Test",
-    "CertificatePath": "Certificates/test-certificate.pfx",
-    "CertificatePassword": "test-password",
-    "Cif": "12345678",
+    "ClientId": "test-client-id",
+    "ClientSecret": "test-client-secret",
+    "RedirectUri": "https://localhost:5001/auth/callback",
     "TimeoutSeconds": 30
   },
   "Logging": {
@@ -117,9 +109,10 @@ Choose **ONE** of the following certificate configuration methods:
 ```json
 {
   "EFactura": {
-    "Environment": "Production",
-    "CertificateThumbprint": "YOUR_CERT_THUMBPRINT",
-    "Cif": "YOUR_REAL_CIF",
+    "Environment": "Production", 
+    "ClientId": "prod-client-id",
+    "ClientSecret": "prod-client-secret",
+    "RedirectUri": "https://yourapp.com/auth/callback",
     "TimeoutSeconds": 60
   },
   "Logging": {
@@ -133,31 +126,32 @@ Choose **ONE** of the following certificate configuration methods:
 
 ## Security Best Practices
 
-### 1. Certificate Security
+### 1. OAuth2 Security
 
 ```json
-// ❌ DON'T: Store production certificates in source control
+// ❌ DON'T: Store production secrets in source control
 {
-  "CertificatePath": "prod-certificate.pfx",
-  "CertificatePassword": "production-password"
+  "ClientId": "production-client-id",
+  "ClientSecret": "production-secret"
 }
 
 // ✅ DO: Use environment variables or secure vaults
 {
-  "CertificateThumbprint": "#{ENV_CERT_THUMBPRINT}",
-  "Cif": "#{ENV_CIF}"
+  "ClientId": "#{ENV_CLIENT_ID}",
+  "ClientSecret": "#{ENV_CLIENT_SECRET}"
 }
 ```
 
-### 2. Password Management
+### 2. Secret Management
 
 ```bash
 # Use environment variables
-export EFactura__CertificatePassword="secure-password"
-export EFactura__Cif="12345678"
+export EFactura__ClientSecret="secure-secret"
+export EFactura__ClientId="your-client-id"
 
 # Or user secrets for development
-dotnet user-secrets set "EFactura:CertificatePassword" "your-password"
+dotnet user-secrets set "EFactura:ClientSecret" "your-secret"
+dotnet user-secrets set "EFactura:ClientId" "your-client-id"
 ```
 
 ### 3. Azure Key Vault Integration
@@ -179,9 +173,10 @@ The library automatically validates configuration on startup. Common validation 
 | Error | Cause | Solution |
 |-------|-------|----------|
 | "Invalid Environment" | Environment not "Test" or "Production" | Check spelling and case |
-| "CIF is required" | Missing or empty CIF | Provide valid Romanian CIF |
-| "Certificate not found" | Invalid certificate path/thumbprint | Verify certificate exists |
-| "Certificate expired" | Certificate past expiry date | Renew certificate |
+| "ClientId is required" | Missing or empty ClientId | Provide valid ANAF Client ID |
+| "ClientSecret is required" | Missing or empty ClientSecret | Provide valid ANAF Client Secret |
+| "RedirectUri is required" | Missing or empty RedirectUri | Provide registered callback URL |
+| "Invalid RedirectUri format" | Malformed URL | Ensure valid URL format |
 
 ## Logging Configuration
 
@@ -217,84 +212,91 @@ The library automatically validates configuration on startup. Common validation 
 
 ## Complete Configuration Examples
 
-### Example 1: USB Token Configuration
-
-```json
-{
-  "EFactura": {
-    "Environment": "Production",
-    "CertificateThumbprint": "1234567890ABCDEF1234567890ABCDEF12345678",
-    "Cif": "12345678",
-    "TimeoutSeconds": 60
-  }
-}
-```
-
-### Example 2: File-Based Certificate (Development)
+### Example 1: Development Configuration
 
 ```json
 {
   "EFactura": {
     "Environment": "Test",
-    "CertificatePath": "Certificates/dev-certificate.pfx",
-    "CertificatePassword": "dev-password",
-    "Cif": "12345678",
+    "ClientId": "dev-client-id-from-anaf",
+    "ClientSecret": "dev-client-secret-from-anaf",
+    "RedirectUri": "https://localhost:5001/auth/callback",
     "TimeoutSeconds": 30
   }
 }
 ```
 
-### Example 3: Azure Production Configuration
+### Example 2: Production Configuration with Azure Key Vault
 
 ```json
 {
   "EFactura": {
     "Environment": "Production",
-    "CertificateThumbprint": "#{KeyVault.CertificateThumbprint}",
-    "Cif": "#{KeyVault.CompanyCif}",
+    "ClientId": "#{KeyVault.ANAFClientId}",
+    "ClientSecret": "#{KeyVault.ANAFClientSecret}",
+    "RedirectUri": "https://yourapp.com/auth/callback",
     "TimeoutSeconds": 90
   }
 }
+```
+
+### Example 3: Environment Variables Configuration
+
+```bash
+# Set environment variables
+export EFactura__Environment="Production"
+export EFactura__ClientId="your-production-client-id"
+export EFactura__ClientSecret="your-production-client-secret"
+export EFactura__RedirectUri="https://yourapp.com/auth/callback"
 ```
 
 ## Configuration Troubleshooting
 
 ### Common Issues
 
-1. **Certificate Not Loading**
-   - Verify certificate exists at specified path
-   - Check certificate permissions
-   - Ensure password is correct
+1. **OAuth Authentication Failures**
+   - Verify ClientId and ClientSecret are correct
+   - Ensure RedirectUri matches exactly what's registered with ANAF
+   - Check that your ANAF application is approved and active
 
-2. **USB Token Not Recognized**
-   - Install token drivers
-   - Check certificate appears in Certificate Manager
-   - Try different certificate identification method
+2. **Redirect URI Mismatch**
+   - RedirectUri in configuration must exactly match ANAF registration
+   - Include protocol (https://) and exact path
+   - No trailing slashes unless registered that way
 
-3. **Authentication Failures**
-   - Verify CIF is correct
-   - Check certificate is not expired
-   - Ensure using correct environment
+3. **Token Exchange Failures**
+   - Verify authorization code is used immediately (short expiry)
+   - Check network connectivity to ANAF OAuth endpoints
+   - Ensure correct environment (Test vs Production)
 
 ### Debugging Configuration
 
-Enable debug logging to see configuration loading:
+Enable debug logging to see OAuth flow details:
 
 ```json
 {
   "Logging": {
     "LogLevel": {
-      "RomaniaEFacturaLibrary.Configuration": "Debug"
+      "RomaniaEFacturaLibrary.Services.Authentication": "Debug"
     }
   }
 }
 ```
 
 This will log:
-- Configuration values being loaded
-- Certificate loading attempts
-- Environment selection
-- Validation results
+- Authorization URL generation
+- Token exchange requests/responses
+- Token refresh operations
+- Authentication errors
+
+## ANAF Application Registration
+
+Before using the library, you must register your application with ANAF:
+
+1. **Register Application**: Contact ANAF to register your OAuth2 application
+2. **Get Credentials**: Receive ClientId and ClientSecret from ANAF
+3. **Register Callback URL**: Provide your RedirectUri to ANAF
+4. **Test Environment**: Start with Test environment before Production
 
 ---
 
@@ -302,11 +304,11 @@ This will log:
 
 For a quick setup, ensure you have:
 
-- [ ] Valid Romanian CIF
-- [ ] Digital certificate (file or USB token)
-- [ ] Certificate password (if using .pfx file)
-- [ ] Correct environment setting
-- [ ] Appropriate timeout values
-- [ ] Secure configuration storage
+- [ ] ANAF OAuth2 application registration complete
+- [ ] Valid ClientId from ANAF
+- [ ] Valid ClientSecret from ANAF  
+- [ ] Registered RedirectUri with ANAF
+- [ ] Correct environment setting (Test/Production)
+- [ ] Secure configuration storage (no secrets in source control)
 
-Your Romania EFactura Library is ready to use!
+Your Romania EFactura Library is ready for OAuth2 authentication with ANAF!

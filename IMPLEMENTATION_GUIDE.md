@@ -1,19 +1,20 @@
 # Romania EFactura Library - Complete Implementation Guide
 
-This comprehensive guide will walk you through implementing the Romania EFactura Library in your ASP.NET Core application, from installation to production deployment with digital certificates.
+This comprehensive guide will walk you through implementing the Romania EFactura Library in your ASP.NET Core application, from installation to production deployment with OAuth2 authentication.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
 2. [Installation](#installation)
-3. [Digital Certificate Setup](#digital-certificate-setup)
-4. [Project Configuration](#project-configuration)
+3. [ANAF Application Registration](#anaf-application-registration)
+4. [OAuth2 Configuration](#oauth2-configuration)
 5. [Dependency Injection Setup](#dependency-injection-setup)
-6. [Creating Controllers and Endpoints](#creating-controllers-and-endpoints)
-7. [Configuration Files](#configuration-files)
-8. [Testing Your Implementation](#testing-your-implementation)
-9. [Production Deployment](#production-deployment)
-10. [Troubleshooting](#troubleshooting)
+6. [Authentication Implementation](#authentication-implementation)
+7. [Creating Controllers and Endpoints](#creating-controllers-and-endpoints)
+8. [Configuration Files](#configuration-files)
+9. [Testing Your Implementation](#testing-your-implementation)
+10. [Production Deployment](#production-deployment)
+11. [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
@@ -21,9 +22,9 @@ Before starting, ensure you have:
 
 - **.NET 8.0 or .NET 9.0 SDK** installed
 - **Visual Studio 2022** or **VS Code** with C# extension
+- **ANAF Application Registration** with OAuth2 credentials
 - **Valid Romanian CIF** registered with ANAF for EFactura
-- **Digital Certificate** from a qualified provider (for production) or test certificate
-- **USB Token/Smart Card** with the digital certificate (if applicable)
+- **Registered Redirect URI** with ANAF for OAuth callbacks
 
 ## Installation
 
@@ -54,85 +55,96 @@ After installation, your project should have the following dependencies automati
 - Microsoft.Extensions.Http
 - System.Security.Cryptography.X509Certificates
 
-## Digital Certificate Setup
+## ANAF Application Registration
 
-### Understanding Digital Certificates for EFactura
+### Understanding OAuth2 Authentication for EFactura
 
-Romania's EFactura system requires digital certificates for authentication. These certificates can be:
+Romania's EFactura system uses OAuth2 authentication with ANAF's Identity Provider. You need to register your application with ANAF to get:
 
-1. **Qualified Digital Certificates** (for production)
-   - Issued by authorized providers (CertSign, Zertificon, etc.)
-   - Stored on USB tokens or smart cards
-   - Required for production ANAF environment
+1. **Client ID** - Public identifier for your application
+2. **Client Secret** - Secret key for authenticating your application  
+3. **Redirect URI** - Callback URL where ANAF sends authorization codes
 
-2. **Test Certificates** (for development)
-   - Self-signed certificates for testing
-   - Provided by ANAF for sandbox environment
+### Step 3: Register Your Application with ANAF
 
-### Step 3: Certificate Installation and Access
+1. **Contact ANAF** to register your OAuth2 application
+   - Submit application registration request
+   - Provide your application details and redirect URI
+   - Wait for ANAF approval
 
-#### Option A: USB Token/Smart Card Certificate
+2. **Receive Credentials**
+   - **Client ID**: Public identifier (e.g., "your-app-client-id")
+   - **Client Secret**: Secret key (keep secure!)
+   - **Approved Redirect URI**: Must match exactly in your app
 
-When you insert your USB token or smart card:
+3. **Environment Setup**
+   - Start with **Test environment** for development
+   - Request **Production access** after testing
 
-1. **Install Certificate Drivers**
-   - Install the drivers provided by your certificate issuer
-   - Ensure the certificate appears in Windows Certificate Store
+### Step 4: OAuth2 Flow Overview
 
-2. **Locate Certificate Path**
-   - Open `certmgr.msc` (Certificate Manager)
-   - Navigate to **Personal > Certificates**
-   - Find your certificate and note the **Thumbprint** or **Subject**
+The library implements the OAuth2 Authorization Code Flow:
 
-3. **Export Certificate (if needed)**
-   - Right-click your certificate
-   - Choose **All Tasks > Export**
-   - Export as `.pfx` with password protection
-   - Save to a secure location in your application
+```
+1. Your App → User's Browser: Redirect to ANAF authorization URL
+2. User's Browser → ANAF: User authenticates with digital certificate
+3. ANAF → Your App: Redirects back with authorization code
+4. Your App → ANAF: Exchanges code for access token + refresh token
+5. Your App → ANAF API: Uses access token for EFactura operations
+```
 
-#### Option B: File-Based Certificate
+## OAuth2 Configuration
 
-If you have a `.pfx` certificate file:
+### Step 5: Configure appsettings.json
 
-1. **Secure Storage**
-   ```
-   YourProject/
-   ├── Certificates/
-   │   ├── test-certificate.pfx      # Test environment
-   │   └── prod-certificate.pfx      # Production environment
-   ├── appsettings.json
-   └── appsettings.Production.json
-   ```
-
-2. **File Security**
-   - Store certificates outside the web root
-   - Use restrictive file permissions
-   - Never commit certificates to source control
-
-## Project Configuration
-
-### Step 4: Create Configuration Models
-
-If you want to extend the configuration, create additional models:
-
-```csharp
-// Models/EFacturaSettings.cs
-public class EFacturaSettings
+```json
 {
-    public string Environment { get; set; } = "Test";
-    public string CertificatePath { get; set; } = "";
-    public string CertificatePassword { get; set; } = "";
-    public string CertificateThumbprint { get; set; } = "";
-    public string Cif { get; set; } = "";
-    public int TimeoutSeconds { get; set; } = 30;
-    public bool EnableLogging { get; set; } = true;
-    public string LogLevel { get; set; } = "Information";
+  "EFactura": {
+    "Environment": "Test",
+    "ClientId": "your-anaf-client-id",
+    "ClientSecret": "your-anaf-client-secret", 
+    "RedirectUri": "https://localhost:5001/auth/callback",
+    "TimeoutSeconds": 30
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "RomaniaEFacturaLibrary": "Debug"
+    }
+  }
 }
+```
+
+### Step 6: Secure Configuration for Production
+
+```json
+// appsettings.Production.json
+{
+  "EFactura": {
+    "Environment": "Production",
+    "ClientId": "#{ENV_CLIENT_ID}",           // From environment variables
+    "ClientSecret": "#{ENV_CLIENT_SECRET}",   // From Azure Key Vault
+    "RedirectUri": "https://yourapp.com/auth/callback",
+    "TimeoutSeconds": 60
+  }
+}
+```
+
+### Environment Variables for Security
+
+```bash
+# Development
+export EFactura__ClientId="dev-client-id"
+export EFactura__ClientSecret="dev-client-secret"
+
+# Or use user secrets
+dotnet user-secrets set "EFactura:ClientSecret" "your-secret"
+```
 ```
 
 ## Dependency Injection Setup
 
-### Step 5: Configure Services in Program.cs
+### Step 7: Configure Services in Program.cs
 
 ```csharp
 // Program.cs
@@ -145,7 +157,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure EFactura Services
+// Configure EFactura Services with OAuth2
 builder.Services.AddEFacturaServices(builder.Configuration);
 
 // Alternative: Manual configuration
@@ -153,8 +165,191 @@ builder.Services.AddEFacturaServices(builder.Configuration);
 builder.Services.AddEFacturaServices(options =>
 {
     options.Environment = EFacturaEnvironment.Test; // or Production
-    options.CertificatePath = "Certificates/certificate.pfx";
-    options.CertificatePassword = "your-certificate-password";
+    options.ClientId = "your-anaf-client-id";
+    options.ClientSecret = "your-anaf-client-secret";
+    options.RedirectUri = "https://localhost:5001/auth/callback";
+});
+*/
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+```
+
+### Step 8: Verify Service Registration
+
+After adding the services, the following will be available for dependency injection:
+
+- `IAuthenticationService` - OAuth2 authentication handling
+- `IEFacturaClient` - Main client for EFactura operations  
+- `IXmlService` - UBL XML processing
+- `IValidationService` - Invoice validation
+
+## Authentication Implementation
+
+### Step 9: Create Authentication Controller
+
+```csharp
+// Controllers/AuthController.cs
+using Microsoft.AspNetCore.Mvc;
+using RomaniaEFacturaLibrary.Services.Authentication;
+
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly IAuthenticationService _authService;
+    private readonly ILogger<AuthController> _logger;
+
+    public AuthController(IAuthenticationService authService, ILogger<AuthController> logger)
+    {
+        _authService = authService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Step 1: Initiate OAuth2 authentication with ANAF
+    /// </summary>
+    [HttpGet("login")]
+    public IActionResult Login(string? returnUrl = null)
+    {
+        try
+        {
+            // Generate unique state for CSRF protection
+            var state = Guid.NewGuid().ToString();
+            
+            // Store state in session for verification (implement as needed)
+            HttpContext.Session.SetString("oauth_state", state);
+            if (!string.IsNullOrEmpty(returnUrl))
+            {
+                HttpContext.Session.SetString("return_url", returnUrl);
+            }
+
+            // Get ANAF authorization URL
+            var authUrl = _authService.GetAuthorizationUrl("efactura", state);
+            
+            _logger.LogInformation("Redirecting user to ANAF OAuth: {AuthUrl}", authUrl);
+            
+            return Redirect(authUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error initiating OAuth authentication");
+            return BadRequest("Authentication initiation failed");
+        }
+    }
+
+    /// <summary>
+    /// Step 2: Handle OAuth callback from ANAF
+    /// </summary>
+    [HttpGet("callback")]
+    public async Task<IActionResult> Callback(string? code, string? state, string? error)
+    {
+        try
+        {
+            // Check for OAuth errors
+            if (!string.IsNullOrEmpty(error))
+            {
+                _logger.LogError("OAuth error received: {Error}", error);
+                return BadRequest($"Authentication failed: {error}");
+            }
+
+            // Verify state parameter (CSRF protection)
+            var sessionState = HttpContext.Session.GetString("oauth_state");
+            if (string.IsNullOrEmpty(state) || state != sessionState)
+            {
+                _logger.LogWarning("Invalid or missing state parameter");
+                return BadRequest("Invalid authentication state");
+            }
+
+            // Verify authorization code
+            if (string.IsNullOrEmpty(code))
+            {
+                _logger.LogWarning("Authorization code not received");
+                return BadRequest("Authorization code missing");
+            }
+
+            // Exchange code for tokens
+            var tokenResponse = await _authService.ExchangeCodeForTokenAsync(code);
+            if (tokenResponse == null)
+            {
+                _logger.LogError("Failed to exchange authorization code for tokens");
+                return BadRequest("Token exchange failed");
+            }
+
+            // Store tokens securely (implement based on your needs)
+            _authService.SetToken(tokenResponse);
+            
+            _logger.LogInformation("OAuth authentication successful");
+
+            // Redirect to original URL or dashboard
+            var returnUrl = HttpContext.Session.GetString("return_url") ?? "/dashboard";
+            HttpContext.Session.Remove("oauth_state");
+            HttpContext.Session.Remove("return_url");
+
+            return Redirect(returnUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing OAuth callback");
+            return BadRequest("Authentication callback processing failed");
+        }
+    }
+
+    /// <summary>
+    /// Check current authentication status
+    /// </summary>
+    [HttpGet("status")]
+    public async Task<IActionResult> Status()
+    {
+        try
+        {
+            var accessToken = await _authService.GetValidAccessTokenAsync();
+            return Ok(new { IsAuthenticated = !string.IsNullOrEmpty(accessToken) });
+        }
+        catch (AuthenticationException)
+        {
+            return Ok(new { IsAuthenticated = false });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking authentication status");
+            return StatusCode(500, "Error checking authentication status");
+        }
+    }
+}
+```
+
+### Step 10: Enable Session Support (Required for State Management)
+
+Add session support to Program.cs:
+
+```csharp
+// Program.cs - Add these lines before var app = builder.Build();
+
+// Add session support for OAuth state management
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// After var app = builder.Build(), add:
+app.UseSession(); // Add this before app.UseAuthorization();
+```
     options.Cif = "12345678";
     options.TimeoutSeconds = 30;
 });

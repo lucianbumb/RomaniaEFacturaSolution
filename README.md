@@ -34,7 +34,8 @@ This library provides a complete solution for:
 ## Features
 
 ### 🔐 Authentication
-- OAuth2 authentication with X.509 digital certificates
+- OAuth2 authorization code flow with ANAF
+- Client credentials (ClientId, ClientSecret) from ANAF application registration
 - Automatic token management and refresh
 - Support for test and production environments
 
@@ -74,9 +75,9 @@ Configure in `appsettings.json`:
 {
   "EFactura": {
     "Environment": "Test",
-    "CertificatePath": "path/to/certificate.pfx",
-    "CertificatePassword": "certificate-password",
-    "Cif": "your-company-cif",
+    "ClientId": "your-anaf-client-id",
+    "ClientSecret": "your-anaf-client-secret", 
+    "RedirectUri": "https://yourapp.com/auth/callback",
     "TimeoutSeconds": 30
   }
 }
@@ -92,15 +93,48 @@ services.AddEFacturaServices(configuration);
 services.AddEFacturaServices(options =>
 {
     options.Environment = EFacturaEnvironment.Test;
-    options.CertificatePath = "certificate.pfx";
-    options.CertificatePassword = "password";
-    options.Cif = "12345678";
+    options.ClientId = "your-client-id";
+    options.ClientSecret = "your-client-secret";
+    options.RedirectUri = "https://yourapp.com/auth/callback";
 });
 ```
 
 ### 4. Basic Usage
 
 ```csharp
+public class AuthController : ControllerBase
+{
+    private readonly IAuthenticationService _authService;
+
+    public AuthController(IAuthenticationService authService)
+    {
+        _authService = authService;
+    }
+
+    [HttpGet("login")]
+    public IActionResult Login()
+    {
+        // Step 1: Get authorization URL for ANAF OAuth
+        var authUrl = _authService.GetAuthorizationUrl("efactura", "unique-state");
+        return Redirect(authUrl);
+    }
+
+    [HttpGet("callback")]
+    public async Task<IActionResult> Callback(string code, string state)
+    {
+        // Step 2: Exchange authorization code for access token
+        var token = await _authService.ExchangeCodeForTokenAsync(code);
+        if (token != null)
+        {
+            // Store token securely (session, database, etc.)
+            _authService.SetToken(token);
+            return Ok("Authentication successful");
+        }
+        
+        return BadRequest("Authentication failed");
+    }
+}
+
 public class InvoiceController : ControllerBase
 {
     private readonly IEFacturaClient _eFacturaClient;
@@ -113,14 +147,7 @@ public class InvoiceController : ControllerBase
     [HttpPost("upload")]
     public async Task<IActionResult> UploadInvoice([FromBody] UblInvoice invoice)
     {
-        // Validate invoice
-        var validation = await _eFacturaClient.ValidateInvoiceAsync(invoice);
-        if (!validation.IsValid)
-        {
-            return BadRequest(validation.Errors);
-        }
-
-        // Upload to ANAF
+        // Upload to ANAF (token will be automatically used)
         var result = await _eFacturaClient.UploadInvoiceAsync(invoice);
         if (result.IsSuccess)
         {
@@ -150,8 +177,8 @@ dotnet run
 ## Requirements
 
 - **.NET 9.0** or later
-- **Digital Certificate** from a qualified provider for production use
-- **Valid CIF** registered with ANAF for EFactura
+- **ANAF Application Registration** (ClientId and ClientSecret)
+- **Registered Redirect URI** with ANAF for OAuth callback
 
 ## Key Dependencies
 
