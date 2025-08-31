@@ -44,11 +44,6 @@ public class EFacturaConfig
     public string RedirectUri { get; set; } = string.Empty;
     
     /// <summary>
-    /// Company fiscal identification code (CIF) - for legacy compatibility
-    /// </summary>
-    public string Cif { get; set; } = string.Empty;
-    
-    /// <summary>
     /// Base URL for ANAF API (will be set based on Environment)
     /// </summary>
     public string BaseUrl => Environment == EFacturaEnvironment.Test 

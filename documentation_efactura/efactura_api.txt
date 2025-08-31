@@ -1,0 +1,236 @@
+Prezentare servicii web pentru Sistemul national privind factura
+electronica RO e-Factura
+Pentru detalii suplimentare despre fiecare serviciu, consultati si prezentarile de tip swagger.
+1. a) Upload: încărcare xml factura
+Apel de tip POST:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+POST https://webserviceapl.anaf.ro/prod/FCTEL/rest/upload?standard ={val1}&cif={val2}
+POST https://webserviceapl.anaf.ro/prod/ FCTEL/rest/upload?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+- test:
+POST https://webserviceapl.anaf.ro/test/ FCTEL/rest/upload?standard={val1}&cif={val2}
+POST https://webserviceapl.anaf.ro/test/ FCTEL/rest/upload?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+ii) folosirea standarului oauth2:
+- producție:
+POST https://api.anaf.ro/prod/ FCTEL/rest/upload?standard={val1}&cif={val2}
+POST https://api.anaf.ro/prod/ FCTEL/rest/upload?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+- test:
+POST https://api.anaf.ro/test/FCTEL/rest/upload?standard ={val1}&cif={val2}
+POST https://api.anaf.ro/test/FCTEL/rest/upload?
+ standard ={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+Parametrii din request standard și cif sunt obligatorii:
+val1 = identificator de tip sir de caractere, valorile acceptate sunt: UBL, CN, CII sau RASP, unde CN este Credit Note
+iar RASP este mesaj de la cumparator catre emitentul facturii
+val2 =cif-ul (numeric) la care se va transmite mesajul de eroare in cazul in care nu se poate identifica vanzatorul din
+XMl-ul facturii. Trebuie sa existe drept in SPV pentru acesta
+Parametrul din request „extern” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care cumparatorul este din exteriorul Romaniei(nu are CUI sau NIF)
+Parametrul din request „autofactura” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care se emite factura de catre beneficiar in numele furnizorului.
+Parametrul din request „executare” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care factura este depusa de catre organul de executare in numele debitorului.
+1. b) Upload B2C: încărcare xml factura
+Apel de tip POST:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+POST https://webserviceapl.anaf.ro/prod/FCTEL/rest/uploadb2c?standard ={val1}&cif={val2}
+POST https://webserviceapl.anaf.ro/prod/ FCTEL/rest/uploadb2c?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+- test:
+POST https://webserviceapl.anaf.ro/test/ FCTEL/rest/uploadb2c?standard={val1}&cif={val2}
+POST https://webserviceapl.anaf.ro/test/ FCTEL/rest/uploadb2c?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+ii) folosirea standarului oauth2:
+- producție:
+POST https://api.anaf.ro/prod/ FCTEL/rest/uploadb2c?standard={val1}&cif={val2}
+POST https://api.anaf.ro/prod/ FCTEL/rest/uploadb2c?
+standard={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+- test:
+POST https://api.anaf.ro/test/FCTEL/rest/uploadb2c?standard ={val1}&cif={val2}
+POST https://api.anaf.ro/test/FCTEL/rest/uploadb2c?
+ standard ={val1}&cif={val2}&extern=DA&autofactura=DA&executare=DA
+Parametrii din request standard și cif sunt obligatorii:
+val1 = identificator de tip sir de caractere, valorile acceptate sunt: UBL, CN, CII sau RASP, unde CN este Credit Note
+iar RASP este mesaj de la cumparator catre emitentul facturii
+val2 =cif-ul (numeric) la care se va transmite mesajul de eroare in cazul in care nu se poate identifica vanzatorul din
+XMl-ul facturii. Trebuie sa existe drept in SPV pentru acesta
+Parametrul din request „extern” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care cumparatorul este din exteriorul Romaniei(nu are CUI sau NIF)
+Parametrul din request „autofactura” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care se emite factura de catre beneficiar in numele furnizorului.
+Parametrul din request „executare” nu este obligatoriu, singura valoare acceptata pentru acest parametru este DA și se
+completeaza doar in cazul in care factura este depusa de catre organul de executare in numele debitorului.
+2. Stare Mesaj – in ce stadiu se gaseste o factura transmisa anterior
+Apel de tip GET:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+GET https://webserviceapl.anaf.ro/prod/ FCTEL/rest/stareMesaj?id_incarcare={val1}
+- test:
+GET https://webserviceapl.anaf.ro/test/FCTEL/rest/stareMesaj?id_incarcare={val1}
+ii) folosirea standarului oauth2:
+- producție:
+GET https://api.anaf.ro/prod/FCTEL/rest/stareMesaj?id_incarcare={val1}
+- test:
+GET https://api.anaf.ro/test/FCTEL/rest/stareMesaj?id_incarcare = {val1}
+Parametrul din request este obligatoriu:
+val1 = indexul de incarcare (numeric) primit la operatiunea de upload
+Parametrii raspuns:
+-stare:
+ ok = fișierul corespunzător facturii a fost validat si prelucrat de sistem. Poate fi descărcat răspunsul ce consta
+intr-un fișier cu factura originala si unul cu semnătura electronica a Ministerului de Finanțe. In acest caz
+factura este disponibila si pentru cumpărător
+ nok – au fost identificate erori si fișierul nu a fost prelucrat. Poate fi descărcat răspunsul constând dintr-un
+fișier cu erorile identificate si unul cu semnătura electronica a Ministerului de Finanțe. In acest caz factura NU
+ajunge la cumpărător
+ XML cu erori nepreluat de sistem – fisierul a fost respins in urma apelului de upload. Eroarea s-a primit ca
+raspuns la request. -in prelucrare – nu s-a finalizat încă prelucrarea fișierului
+3. a) Lista Mesaje – lista de raspunsuri disponibile pentru descarcare
+Apel de tip GET:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+GET https://webserviceapl.anaf.ro/prod/FCTEL/rest/listaMesajeFactura?zile={val1}&cif={val2}
+GET https://webserviceapl.anaf.ro/prod/FCTEL/rest/listaMesajeFactura?
+ zile={val1}&cif={val2} &filtru={val3}
+- test:
+GET https://webserviceapl.anaf.ro/test/FCTEL/rest/listaMesajeFactura?zile ={val1}&cif={val2}
+GET https://webserviceapl.anaf.ro/test/FCTEL/rest/listaMesajeFactura?zile={val1}&cif={val2} &filtru={val3}
+ii) folosirea standarului oauth2:
+- producție:
+GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajeFactura?zile={val1}&cif={val2}
+GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajeFactura?zile={val1}&cif={val2} &filtru={val3}
+- test:
+GET https://api.anaf.ro/test/FCTEL/rest/listaMesajeFactura?zile ={val1}&cif={val2}
+GET https://api.anaf.ro/test/FCTEL/rest/listaMesajeFactura?zile ={val1}&cif={val2} &filtru={val3}
+Parametrii din request sunt obligatorii:
+val1 = numărul de zile pentru care se face interogarea, format numeric, valorile acceptate de la 1 la 60
+val2 = cif-ul (numeric) pentru care se doreste sa se obtina lista de mesaje disponibile
+val3 = parametru folosit pentru filtrarea mesajelor. Nu este obligatoriu. Valorile acceptate sunt:
+E = ERORI FACTURA
+T = FACTURA TRIMISA
+P = FACTURA PRIMITA
+R = MESAJ CUMPARATOR PRIMIT / MESAJ CUMPARATOR TRANSMIS
+Parametrii raspuns:
+- data_creare = data raspunsului
+- cif = cif-ul pentru care este raspunsul descarcabil
+- id_solicitare = indexul de incarcare primit la upload-ul fisierului
+- detalii – amanunte despre răspuns
+- cif_emitent = cif-ul emitentului facturii (vânzător)
+- cif_beneficiar = cif-ul beneficiarului facturii (cumparator)
+- tip:
+ FACTURA TRIMISA = raspuns cu factura originala si semnatura MF, transmis in urma transmiterii
+unei facturi, daca este validata de sistem
+ FACTURA PRIMITA = factura primita in calitate de cunparator de la un emitent care a folosit
+sistemul national privind factura electronica RO e-factura
+ ERORI FACTURA = raspuns cu erorile si semnatura MF, livrat in urma transmiterii unei facturi, daca
+NU este validata de sistem
+ MESAJ CUMPARATOR PRIMIT / MESAJ CUMPARATOR TRANSMIS = mesaj de la cumparator
+catre emitentul facturii (încărcate în sistem prin serviciul de upload ca RASP)
+- id = id folosit de serviciul de descarcare pentru obtinerea mesajului
+3. b)Lista Mesaje cu paginatie – lista de raspunsuri disponibile pentru descarcare
+Apel de tip GET:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+GET https://webserviceapl.anaf.ro/prod/FCTEL/rest/listaMesajePaginatieFactura?
+startTime={val1}&endTime={val2}&cif={val3}&pagina={val4}
+GET https://webserviceapl.anaf.ro/prod/FCTEL/rest/listaMesajePaginatieFactura?
+ startTime={val1}&endTime={val2}&cif={val3}&pagina={val4} &filtru={val5}
+- test:
+GET https://webserviceapl.anaf.ro/test/FCTEL/rest/listaMesajePaginatieFactura?
+startTime={val1}&endTime={val2}&cif={val3}&pagina={val4}
+GET https://webserviceapl.anaf.ro/test/FCTEL/rest/listaMesajePaginatieFactura?
+ startTime={val1}&endTime={val2}&cif={val3}&pagina={val4} &filtru={val5}
+ii) folosirea standarului oauth2:
+- producție:
+GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajePaginatieFactura?
+startTime={val1}&endTime={val2}&cif={val3}&pagina={val4}
+GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajePaginatieFactura?
+ startTime={val1}&endTime={val2}&cif={val3}&pagina={val4} &filtru={val5}
+- test:
+GET https://api.anaf.ro/test/FCTEL/rest/listaMesajePaginatieFactura?
+startTime={val1}&endTime={val2}&cif={val3}&pagina={val4}
+GET https://api.anaf.ro/test/FCTEL/rest/listaMesajePaginatieFactura?
+ startTime={val1}&endTime={val2}&cif={val3}&pagina={val4} &filtru={val5}
+Parametrii din request sunt obligatorii:
+val1 = valoare de start pentru care se face interogarea, format numeric, valorile acceptate unixtimestamp milisecunde
+(ex: 1646037374000 = 28.02.2022 10:36:14)
+val2 = valoare de sfarsit pentru care se face interogarea, format numeric, valorile acceptate unixtimestamp milisecunde
+(ex: 1646170574000 = 01.03.2022 23:36:14)
+val3 = cif-ul (numeric) pentru care se doreste sa se obtina lista de mesaje disponibile
+val4 = numarul paginii ce se dorește a fi afisata, format numeric
+val5 = parametru folosit pentru filtrarea mesajelor. Nu este obligatoriu. Valorile acceptate sunt:
+E = ERORI FACTURA
+T = FACTURA TRIMISA
+P = FACTURA PRIMITA
+R = MESAJ CUMPARATOR PRIMIT / MESAJ CUMPARATOR TRANSMIS
+Parametrii raspuns:
+- data_creare = data raspunsului
+- cif = cif-ul pentru care este raspunsul descarcabil
+- id_solicitare = indexul de incarcare primit la upload-ul fisierului
+- detalii – amanunte despre răspuns
+- cif_emitent = cif-ul emitentului facturii (vânzător)
+- cif_beneficiar = cif-ul beneficiarului facturii (cumparator)
+- tip:
+ FACTURA TRIMISA = raspuns cu factura originala si semnatura MF, transmis in urma transmiterii
+unei facturi, daca este validata de sistem
+ FACTURA PRIMITA = factura primita in calitate de cunparator de la un emitent care a folosit
+sistemul national privind factura electronica RO e-factura
+ ERORI FACTURA = raspuns cu erorile si semnatura MF, livrat in urma transmiterii unei facturi, daca
+NU este validata de sistem
+ MESAJ CUMPARATOR PRIMIT / MESAJ CUMPARATOR TRANSMIS = mesaj de la cumparator
+catre emitentul facturii (încărcate în sistem prin serviciul de upload ca RASP)
+- id = id folosit de serviciul de descarcare pentru obtinerea mesajului
+4. Descarcare – descarcarea unui raspuns
+Apel de tip GET:
+i) prezentarea certificatului digital în momentul apelului:
+- producție:
+GET https://webserviceapl.anaf.ro/prod/FCTEL/rest/descarcare?id={val1}
+- test:
+GET https://webserviceapl.anaf.ro/test/ FCTEL/rest/descarcare?id= {val1}
+ii) folosirea standarului oauth2:
+- producție:
+GET https://api.anaf.ro/prod/ FCTEL/rest/descarcare?id= {val1}
+- test:
+GET https://api.anaf.ro/test/ FCTEL/rest/descarcare?id= {val1}
+Parametrul din request este obligatoriu:
+val1 = id (se ia din răspunsul primit de la apelul făcut pe lista mesaje – „id”)
+După ce se face apelul, se descarcă un zip ce conține doua fișiere tip xml, unul cu factura originala sau cu erorile
+identificate (după caz) iar celălalt cu semnătura electronica a MF
+5. Validare: validarea xml-ului
+Apel de tip POST
+i) fără autentificare:
+- producție:
+POST https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/ {val1}
+ii) folosirea standarului oauth2:
+- producție:
+POST https:// api.anaf.ro /prod/FCTEL/rest/validare/{val1}
+Parametrul din request este obligatoriu:
+val1 = standard - identificator de tip sir de caractere, valorile acceptate sunt: FACT1 și FCN
+Pe headers trebuie trecut Content-Type = text/plain
+6. XmlToPdf: transformarea xml-ului în Pdf
+Apel de tip POST
+i) fără autentificare:
+- producție:
+POST https://webservicesp.anaf.ro/prod/FCTEL/rest/transformare/{val1} / {val2}
+ii) folosirea standarului oauth2:
+- producție:
+POST https://api.anaf.ro/prod/FCTEL/rest/transformare/{val1} /{val2}
+Parametrul din request este obligatoriu:
+val1 = standard - identificator de tip sir de caractere, valorile acceptate sunt: FACT1 și FCN
+val2 = novld – valoarea acceptata este DA. Dacă este prezent și are valoare DA xml-ul transmis nu o să fie validat.
+Atenție!!! Pentru xml-urile nevalidate nu putem garanta corectitudinea informațiilor din pdf-ul generat.
+Pe headers trebuie trecut Content-Type = text/plain
+7. Validarea semnăturii: validarea semnăturii aplicate pe xml facturii
+Apel de tip POST
+i) fără autentificare:
+- producție:
+POST https:// webservicesp .anaf.ro/api/validate/signature
+ii) folosirea standarului oauth2:
+- producție:
+POST https://api.anaf.ro/ api/validate/signature
+Parametrii:
+file = MultipartFile: fișierul xml al facturii
+signature = MultipartFile: fișierul xml ce conține semnătura aplicata pe fișierul xml al facturii
+Ambele fișiere xml se regăsesc în arhiva de tip zip obținută prin apelul serviciului de descărcare

@@ -17,12 +17,12 @@ public interface IEFacturaClient
     /// <summary>
     /// Validates an invoice before uploading
     /// </summary>
-    Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default);
+    Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Uploads an invoice to SPV
     /// </summary>
-    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default);
+    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, string environment = "prod", CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Gets the status of an uploaded invoice
@@ -35,9 +35,9 @@ public interface IEFacturaClient
     Task<StatusResponse> WaitForUploadCompletionAsync(string uploadId, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Gets invoices from a date range
+    /// Gets invoices from a date range for a specific CIF
     /// </summary>
-    Task<List<InvoiceInfo>> GetInvoicesAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default);
+    Task<List<InvoiceInfo>> GetInvoicesAsync(string cif, DateTime from, DateTime to, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Downloads an invoice and extracts the XML content
@@ -62,7 +62,7 @@ public class EFacturaClient : IEFacturaClient
     private readonly EFacturaConfig _config;
     private readonly ILogger<EFacturaClient> _logger;
 
-    public EFacturaClient(
+    internal EFacturaClient(
         IEFacturaApiClient apiClient,
         IXmlService xmlService,
         IOptions<EFacturaConfig> config,
@@ -74,9 +74,9 @@ public class EFacturaClient : IEFacturaClient
         _logger = logger;
     }
 
-    public async Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default)
+    public async Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Validating invoice {InvoiceId}", invoice.Id);
+        _logger.LogInformation("Validating invoice {InvoiceId} for CIF: {Cif}", invoice.Id, cif);
         
         // First validate locally
         var xmlContent = await _xmlService.SerializeInvoiceAsync(invoice, cancellationToken);
@@ -93,22 +93,22 @@ public class EFacturaClient : IEFacturaClient
         }
         
         // Then validate with ANAF
-        return await _apiClient.ValidateInvoiceAsync(xmlContent, cancellationToken);
+        return await _apiClient.ValidateInvoiceAsync(xmlContent, cif, cancellationToken);
     }
 
-    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default)
+    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, string environment = "prod", CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Uploading invoice {InvoiceId}", invoice.Id);
+        _logger.LogInformation("Uploading invoice {InvoiceId} for CIF: {Cif}, Environment: {Environment}", invoice.Id, cif, environment);
         
         // Validate first
-        var validation = await ValidateInvoiceAsync(invoice, cancellationToken);
+        var validation = await ValidateInvoiceAsync(invoice, cif, cancellationToken);
         if (!validation.Success)
         {
             var errors = string.Join(", ", validation.Errors.Select(e => e.Message));
             throw new InvalidOperationException($"Invoice validation failed: {errors}");
         }
         
-        return await _apiClient.UploadInvoiceAsync(invoice, cancellationToken);
+        return await _apiClient.UploadInvoiceAsync(invoice, cif, environment, cancellationToken);
     }
 
     public async Task<StatusResponse> GetUploadStatusAsync(string uploadId, CancellationToken cancellationToken = default)
@@ -147,11 +147,11 @@ public class EFacturaClient : IEFacturaClient
         return await GetUploadStatusAsync(uploadId, cancellationToken);
     }
 
-    public async Task<List<InvoiceInfo>> GetInvoicesAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    public async Task<List<InvoiceInfo>> GetInvoicesAsync(string cif, DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting invoices from {From} to {To}", from, to);
+        _logger.LogInformation("Getting invoices for CIF: {Cif} from {From} to {To}", cif, from, to);
         
-        var response = await _apiClient.GetMessagesAsync(from, to, cancellationToken);
+        var response = await _apiClient.GetMessagesAsync(cif, from, to, cancellationToken);
         
         return response.Messages.Select(m => new InvoiceInfo
         {
