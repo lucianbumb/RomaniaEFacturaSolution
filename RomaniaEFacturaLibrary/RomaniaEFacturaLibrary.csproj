@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     
@@ -15,7 +14,7 @@
     <Description>A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF. Supports OAuth2 authentication with digital certificates, UBL 2.1 XML invoice processing, and complete ANAF API integration for uploading, downloading, and managing invoices.</Description>
     <PackageTags>efactura;romania;anaf;spv;ubl;xml;invoice;oauth2;digital-certificate;accounting;fiscal;tax</PackageTags>
     <PackageProjectUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</RepositoryUrl>
+    <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -45,7 +44,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

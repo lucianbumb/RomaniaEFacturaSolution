@@ -842,7 +842,7 @@ Enable detailed logging for troubleshooting:
 - **ANAF Official Documentation**: [https://www.anaf.ro](https://www.anaf.ro)
 - **EFactura Technical Specifications**: Available on ANAF website
 - **Certificate Providers**: CertSign, Zertificon, etc.
-- **Library GitHub Repository**: [Your repository URL]
+- **Library GitHub Repository**: [https://github.com/lucianbumb/RomaniaEFacturaSolution](https://github.com/lucianbumb/RomaniaEFacturaSolution)
 
 ---
 

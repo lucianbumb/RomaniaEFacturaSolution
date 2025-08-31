@@ -18,7 +18,7 @@ This guide explains how to publish the Romania EFactura Library to NuGet.org.
 - [x] License specified (MIT)
 - [x] Multi-target frameworks (.NET 8.0 and 9.0)
 - [x] Package builds successfully
-- [x] All tests pass (20/20)
+- [x] All tests pass (24/24)
 
 ### ✅ Documentation Complete
 - [x] Comprehensive README.md

@@ -2,6 +2,13 @@
 
 A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF.
 
+## 🚀 Quick Links
+
+- **📋 [Implementation Guide](IMPLEMENTATION_GUIDE.md)** - Complete step-by-step setup
+- **⚙️ [Configuration Guide](CONFIGURATION_GUIDE.md)** - All configuration options  
+- **📦 [Publishing Guide](PUBLISHING_GUIDE.md)** - NuGet publishing instructions
+- **📊 [Project Summary](PROJECT_SUMMARY.md)** - Complete project overview
+
 ## Overview
 
 This library provides a complete solution for:
@@ -11,11 +18,18 @@ This library provides a complete solution for:
 - **Invoice Management** (upload, download, status tracking)
 - **XML Processing** with proper namespace handling and validation
 
-## Projects Structure
+## 📁 Repository Structure
 
-- **`RomaniaEFacturaLibrary`** - Main library with all EFactura functionality
-- **`RomaniaEFacturaConsole`** - Interactive console application for testing
-- **`RomaniaEFacturaLibrary.Tests`** - Comprehensive unit test suite (20 tests)
+- **`RomaniaEFacturaLibrary/`** - Main library with all EFactura functionality
+- **`RomaniaEFacturaConsole/`** - Interactive console application for testing
+- **`RomaniaEFacturaLibrary.Tests/`** - Comprehensive unit test suite (24 tests)
+- **`ExampleBlazorUsage/`** - Example Blazor application implementation
+- **`documentation_efactura/`** - Official ANAF documentation and guides
+- **Documentation Files**:
+  - `IMPLEMENTATION_GUIDE.md` - Step-by-step implementation guide
+  - `CONFIGURATION_GUIDE.md` - Complete configuration reference
+  - `PUBLISHING_GUIDE.md` - NuGet publishing instructions
+  - `PROJECT_SUMMARY.md` - Project overview and status
 
 ## Features
 
@@ -150,8 +164,17 @@ dotnet run
 ## Build Status
 
 ✅ **Solution builds successfully**  
-✅ **All 20 unit tests pass**  
-✅ **Release configuration ready**
+✅ **All 24 unit tests pass**  
+✅ **Release configuration ready**  
+✅ **Multi-target support** (.NET 8.0 and .NET 9.0)  
+✅ **NuGet package ready**
+
+## 🔗 Repository Information
+
+- **GitHub Repository**: [https://github.com/lucianbumb/RomaniaEFacturaSolution](https://github.com/lucianbumb/RomaniaEFacturaSolution)
+- **Package ID**: `RomaniaEFacturaLibrary`
+- **Current Version**: `1.0.0`
+- **License**: MIT
 
 ## Contributing
 
