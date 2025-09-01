@@ -7,21 +7,21 @@
     <!-- NuGet Package Configuration -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RomaniaEFacturaLibrary</PackageId>
-    <PackageVersion>2.0.0</PackageVersion>
+    <PackageVersion>2.0.1</PackageVersion>
     <Authors>Romania EFactura Library Contributors</Authors>
     <Company>Open Source</Company>
     <Product>Romania EFactura Library</Product>
-    <Description>A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF. Features flexible token storage (MemoryCache/Cookie), CIF parameter support, OAuth2 authentication with digital certificates, UBL 2.1 XML invoice processing, and complete ANAF API integration.</Description>
-    <PackageTags>efactura;romania;anaf;spv;ubl;xml;invoice;oauth2;digital-certificate;accounting;fiscal;tax;token-storage;memorycache;cookie</PackageTags>
+    <Description>A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF. Features OAuth2 authentication with digital certificates, UBL 2.1 XML invoice processing, complete ANAF API integration with ClientId/ClientSecret configuration, and comprehensive example controllers.</Description>
+    <PackageTags>efactura;romania;anaf;spv;ubl;xml;invoice;oauth2;digital-certificate;accounting;fiscal;tax;clientid;clientsecret;jwt</PackageTags>
     <PackageProjectUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</PackageProjectUrl>
     <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Version 2.0.0: Major update with flexible token storage system (MemoryCache/Cookie), CIF parameters instead of configuration, comprehensive example controllers, enhanced security, and improved API design. Breaking changes: CIF now required as method parameters.</PackageReleaseNotes>
+    <PackageReleaseNotes>Version 2.0.1: Fixed dependency injection issues, corrected OAuth2 authentication flow with proper ClientId/ClientSecret configuration, added comprehensive example controllers (AuthController, EFacturaController, ExamplesController), fixed all unit tests, eliminated build warnings, and improved documentation with step-by-step integration guides.</PackageReleaseNotes>
     <Copyright>Copyright © 2025 Romania EFactura Library Contributors</Copyright>
-    <AssemblyVersion>2.0.0</AssemblyVersion>
-    <FileVersion>2.0.0</FileVersion>
+    <AssemblyVersion>2.0.1</AssemblyVersion>
+    <FileVersion>2.0.1</FileVersion>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
     <!-- Local NuGet package output directory -->
