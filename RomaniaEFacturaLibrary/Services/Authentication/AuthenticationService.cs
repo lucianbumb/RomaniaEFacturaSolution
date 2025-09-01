@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Http;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RomaniaEFacturaLibrary.Configuration;
 using RomaniaEFacturaLibrary.Models.Authentication;
-using RomaniaEFacturaLibrary.Services.TokenStorage;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
@@ -12,13 +12,30 @@ using System.Web;
 namespace RomaniaEFacturaLibrary.Services.Authentication;
 
 /// <summary>
-/// Service for handling OAuth2 authentication with ANAF
+/// OAuth2 authentication flow state
+/// </summary>
+public class OAuth2State
+{
+    public string State { get; set; } = Guid.NewGuid().ToString();
+    public string? CodeVerifier { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Service for handling OAuth2 authentication with ANAF using digital certificates
 /// </summary>
 public interface IAuthenticationService
 {
     /// <summary>
     /// Constructs the Authorization URL for redirecting the user to ANAF's Identity Provider (IdP) for authentication.
+    /// This URL is used in a web application context where the user's browser is redirected to ANAF for consent.
+    /// This method does not make an HTTP request itself.
     /// </summary>
+    /// <param name="clientId">The Client ID obtained from ANAF application registration.</param>
+    /// <param name="redirectUri">The Redirect URI registered with ANAF, where the authorization code will be sent.</param>
+    /// <param name="scope">Optional: The scope of access being requested (e.g., "efactura").</param>
+    /// <param name="state">Optional: A unique value to maintain state between the request and callback to prevent CSRF attacks.</param>
+    /// <returns>The constructed authorization URL string.</returns>
     string GetAuthorizationUrl(string clientId, string redirectUri, string? scope = null, string? state = null);
     
     /// <summary>
@@ -27,82 +44,70 @@ public interface IAuthenticationService
     string GetAuthorizationUrl(string? scope = null, string? state = null);
     
     /// <summary>
-    /// Exchanges authorization code for access token
+    /// Gets an access token and refresh token from ANAF's token endpoint using the authorization code.
+    /// This is the second step in the OAuth 2.0 Authorization Code Flow.
     /// </summary>
-    Task<TokenDto> ExchangeCodeForTokenAsync(string code, CancellationToken cancellationToken = default);
+    /// <param name="code">The authorization code received from the IdP callback.</param>
+    /// <param name="redirectUri">The Redirect URI used in the initial authorization request. Must match exactly.</param>
+    /// <param name="clientId">The Client ID for your ANAF application.</param>
+    /// <param name="clientSecret">The Client Secret for your ANAF application.</param>
+    /// <returns>An TokenResponse object containing the tokens, or null on failure.</returns>
+    Task<TokenResponse?> GetAccessTokenAsync(string code, string redirectUri, string clientId, string clientSecret);
     
     /// <summary>
-    /// Refreshes an expired access token
+    /// Gets access token using configuration values
     /// </summary>
-    Task<TokenDto> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+    Task<TokenResponse?> ExchangeCodeForTokenAsync(string code);
     
     /// <summary>
-    /// Gets a valid access token (backward compatibility)
+    /// Refreshes an expired access token using the refresh token obtained previously.
+    /// This avoids requiring the user to re-authenticate with ANAF.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token.</param>
+    /// <param name="clientId">The Client ID for your ANAF application.</param>
+    /// <param name="clientSecret">The Client Secret for your ANAF application.</param>
+    /// <returns>An TokenResponse object with new tokens, or null on failure.</returns>
+    Task<TokenResponse?> RefreshAccessTokenAsync(string refreshToken, string clientId, string clientSecret);
+    
+    /// <summary>
+    /// Gets a valid access token, refreshing if necessary
     /// </summary>
     Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Gets a valid access token using HttpContext for user identification
+    /// Sets the current token (used after code exchange)
     /// </summary>
-    Task<string> GetValidAccessTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Sets the current token (in-memory only)
-    /// </summary>
-    void SetToken(TokenDto token);
-    
-    /// <summary>
-    /// Sets token for a specific user
-    /// </summary>
-    Task SetTokenAsync(string userName, TokenDto token, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Sets token using HttpContext to determine user
-    /// </summary>
-    Task SetTokenAsync(HttpContext httpContext, TokenDto token, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Removes token for a specific user
-    /// </summary>
-    Task RemoveTokenAsync(string userName, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Removes token using HttpContext
-    /// </summary>
-    Task RemoveTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Gets the current token (in-memory)
-    /// </summary>
-    TokenDto? GetCurrentToken();
-    
-    /// <summary>
-    /// Gets the current token using HttpContext
-    /// </summary>
-    Task<TokenDto?> GetCurrentTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
+    void SetToken(TokenResponse token);
 }
 
 public class AuthenticationService : IAuthenticationService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly EFacturaConfig _config;
-    private readonly ITokenStorageService? _tokenStorage;
     private readonly ILogger<AuthenticationService> _logger;
-    private TokenDto? _currentToken;
+    private TokenResponse? _currentToken;
     private readonly SemaphoreSlim _tokenSemaphore = new(1, 1);
 
     public AuthenticationService(
-        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
         IOptions<EFacturaConfig> config,
-        ILogger<AuthenticationService> logger,
-        ITokenStorageService? tokenStorage = null)
+        ILogger<AuthenticationService> logger)
     {
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _config = config.Value;
         _logger = logger;
-        _tokenStorage = tokenStorage;
     }
 
+    /// <summary>
+    /// Constructs the Authorization URL for redirecting the user to ANAF's Identity Provider (IdP) for authentication.
+    /// This URL is used in a web application context where the user's browser is redirected to ANAF for consent.
+    /// This method does not make an HTTP request itself.
+    /// </summary>
+    /// <param name="clientId">The Client ID obtained from ANAF application registration.</param>
+    /// <param name="redirectUri">The Redirect URI registered with ANAF, where the authorization code will be sent.</param>
+    /// <param name="scope">Optional: The scope of access being requested (e.g., "efactura").</param>
+    /// <param name="state">Optional: A unique value to maintain state between the request and callback to prevent CSRF attacks.</param>
+    /// <returns>The constructed authorization URL string.</returns>
     public string GetAuthorizationUrl(string clientId, string redirectUri, string? scope = null, string? state = null)
     {
         _logger.LogInformation("Constructing ANAF OAuth Authorization URL.");
@@ -112,7 +117,7 @@ public class AuthenticationService : IAuthenticationService
         query["response_type"] = "code";
         query["client_id"] = clientId;
         query["redirect_uri"] = redirectUri;
-        query["token_content_type"] = "jwt";
+        query["token_content_type"] = "jwt"; // As specified in the documentation for JWT tokens
 
         if (!string.IsNullOrEmpty(scope))
         {
@@ -128,80 +133,151 @@ public class AuthenticationService : IAuthenticationService
         return uriBuilder.ToString();
     }
 
+    /// <summary>
+    /// Gets the authorization URL using configuration values
+    /// </summary>
     public string GetAuthorizationUrl(string? scope = null, string? state = null)
     {
         return GetAuthorizationUrl(_config.ClientId, _config.RedirectUri, scope, state);
     }
 
-    public async Task<TokenDto> ExchangeCodeForTokenAsync(string code, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Gets an access token and refresh token from ANAF's token endpoint using the authorization code.
+    /// This is the second step in the OAuth 2.0 Authorization Code Flow.
+    /// </summary>
+    /// <param name="code">The authorization code received from the IdP callback.</param>
+    /// <param name="redirectUri">The Redirect URI used in the initial authorization request. Must match exactly.</param>
+    /// <param name="clientId">The Client ID for your ANAF application.</param>
+    /// <param name="clientSecret">The Client Secret for your ANAF application.</param>
+    /// <returns>An TokenResponse object containing the tokens, or null on failure.</returns>
+    public async Task<TokenResponse?> GetAccessTokenAsync(string code, string redirectUri, string clientId, string clientSecret)
     {
-        _logger.LogInformation("Exchanging authorization code for access token");
+        using var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_config.OAuthBaseUrl);
 
-        var authenticationString = $"{_config.ClientId}:{_config.ClientSecret}";
+        // Set Basic Authentication header using client_id and client_secret as required by the documentation
+        var authenticationString = $"{clientId}:{clientSecret}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(Encoding.ASCII.GetBytes(authenticationString));
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
 
         var content = new FormUrlEncodedContent([
             new KeyValuePair<string, string>("grant_type", "authorization_code"),
             new KeyValuePair<string, string>("code", code),
-            new KeyValuePair<string, string>("redirect_uri", _config.RedirectUri),
-            new KeyValuePair<string, string>("token_content_type", "jwt")
+            new KeyValuePair<string, string>("redirect_uri", redirectUri),
+            new KeyValuePair<string, string>("token_content_type", "jwt") // Required parameter as per doc
         ]);
 
-        var response = await _httpClient.PostAsync(_config.TokenUrl, content, cancellationToken);
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        _logger.LogInformation("Sending access token request to ANAF OAuth endpoint...");
 
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            _logger.LogError("Token exchange failed with status {StatusCode}: {Content}", response.StatusCode, responseContent);
-            throw new AuthenticationException($"Token exchange failed: {response.StatusCode}");
-        }
+            var response = await client.PostAsync("token", content);
+            var responseBody = await response.Content.ReadAsStringAsync();
 
-        var tokenResponse = JsonSerializer.Deserialize<TokenDto>(responseContent);
-        if (tokenResponse == null)
+            _logger.LogInformation("Received access token response from ANAF (Status: {StatusCode}): {Response}", response.StatusCode, responseBody);
+
+            response.EnsureSuccessStatusCode(); // Throws an exception for non-success status codes (4xx, 5xx)
+
+            // Deserialize the JSON response using System.Text.Json (modern .NET serializer)
+            var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseBody);
+            
+            if (tokenResponse != null)
+            {
+                _currentToken = tokenResponse;
+            }
+            
+            return tokenResponse;
+        }
+        catch (HttpRequestException e)
         {
-            throw new AuthenticationException("Invalid token response format");
+            _logger.LogError(e, "HttpRequestException when getting access token: {Message}", e.Message);
+            return null;
         }
-
-        _currentToken = tokenResponse;
-        _logger.LogInformation("Token exchange successful. Token expires in {ExpiresIn} seconds", tokenResponse.ExpiresIn);
-
-        return tokenResponse;
+        catch (System.Text.Json.JsonException e)
+        {
+            _logger.LogError(e, "JSON deserialization error when getting access token: {Message}", e.Message);
+            return null;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "An unexpected error occurred when getting access token: {Message}", e.Message);
+            return null;
+        }
     }
 
-    public async Task<TokenDto> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Gets access token using configuration values
+    /// </summary>
+    public async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code)
     {
-        _logger.LogInformation("Refreshing access token");
+        return await GetAccessTokenAsync(code, _config.RedirectUri, _config.ClientId, _config.ClientSecret);
+    }
 
-        var authenticationString = $"{_config.ClientId}:{_config.ClientSecret}";
+    /// <summary>
+    /// Refreshes an expired access token using the refresh token obtained previously.
+    /// This avoids requiring the user to re-authenticate with ANAF.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token.</param>
+    /// <param name="clientId">The Client ID for your ANAF application.</param>
+    /// <param name="clientSecret">The Client Secret for your ANAF application.</param>
+    /// <returns>An TokenResponse object with new tokens, or null on failure.</returns>
+    public async Task<TokenResponse?> RefreshAccessTokenAsync(string refreshToken, string clientId, string clientSecret)
+    {
+        using var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_config.OAuthBaseUrl);
+
+        // Set Basic Authentication header
+        var authenticationString = $"{clientId}:{clientSecret}";
         var base64EncodedAuthenticationString = Convert.ToBase64String(Encoding.ASCII.GetBytes(authenticationString));
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedAuthenticationString);
 
         var content = new FormUrlEncodedContent([
             new KeyValuePair<string, string>("grant_type", "refresh_token"),
             new KeyValuePair<string, string>("refresh_token", refreshToken),
-            new KeyValuePair<string, string>("token_content_type", "jwt")
+            new KeyValuePair<string, string>("token_content_type", "jwt") // Required parameter
         ]);
 
-        var response = await _httpClient.PostAsync(_config.TokenUrl, content, cancellationToken);
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        _logger.LogInformation("Sending refresh token request to ANAF OAuth endpoint...");
 
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            _logger.LogError("Token refresh failed with status {StatusCode}: {Content}", response.StatusCode, responseContent);
-            throw new AuthenticationException($"Token refresh failed: {response.StatusCode}");
-        }
+            var response = await client.PostAsync("token", content);
+            var responseBody = await response.Content.ReadAsStringAsync();
 
-        var tokenResponse = JsonSerializer.Deserialize<TokenDto>(responseContent);
-        if (tokenResponse == null)
+            _logger.LogInformation("Received refresh token response from ANAF (Status: {StatusCode}): {Response}", response.StatusCode, responseBody);
+
+            response.EnsureSuccessStatusCode(); // Throws an exception for non-success status codes
+
+            var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseBody);
+            
+            if (tokenResponse != null)
+            {
+                _currentToken = tokenResponse;
+            }
+            
+            return tokenResponse;
+        }
+        catch (HttpRequestException e)
         {
-            throw new AuthenticationException("Invalid token response format");
+            _logger.LogError(e, "HttpRequestException when refreshing access token: {Message}", e.Message);
+            return null;
         }
+        catch (System.Text.Json.JsonException e)
+        {
+            _logger.LogError(e, "JSON deserialization error when refreshing access token: {Message}", e.Message);
+            return null;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "An unexpected error occurred when refreshing access token: {Message}", e.Message);
+            return null;
+        }
+    }
 
-        _currentToken = tokenResponse;
-        _logger.LogInformation("Token refresh successful. New token expires in {ExpiresIn} seconds", tokenResponse.ExpiresIn);
-
-        return tokenResponse;
+    public void SetToken(TokenResponse token)
+    {
+        _currentToken = token;
+        _logger.LogInformation("Token set manually, expires in {ExpiresIn} seconds", token.ExpiresIn);
     }
 
     public async Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default)
@@ -209,167 +285,40 @@ public class AuthenticationService : IAuthenticationService
         await _tokenSemaphore.WaitAsync(cancellationToken);
         try
         {
+            // Check if we have a valid token
             if (_currentToken?.IsValid == true)
             {
+                _logger.LogDebug("Using existing valid access token");
                 return _currentToken.AccessToken;
             }
 
+            // Try to refresh if we have a refresh token
             if (_currentToken?.RefreshToken != null)
             {
                 try
                 {
-                    var refreshedToken = await RefreshTokenAsync(_currentToken.RefreshToken, cancellationToken);
-                    return refreshedToken.AccessToken;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to refresh token");
-                }
-            }
-
-            throw new AuthenticationException("No valid access token available. Please re-authenticate.");
-        }
-        finally
-        {
-            _tokenSemaphore.Release();
-        }
-    }
-
-    public async Task<string> GetValidAccessTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
-    {
-        await _tokenSemaphore.WaitAsync(cancellationToken);
-        try
-        {
-            // Try to get token from storage first
-            if (_tokenStorage != null)
-            {
-                var storedToken = await _tokenStorage.GetTokenAsync(httpContext, cancellationToken);
-                if (storedToken?.IsValid == true)
-                {
-                    _currentToken = storedToken;
-                    return storedToken.AccessToken;
-                }
-
-                // Try to refresh if we have a refresh token
-                if (storedToken?.RefreshToken != null)
-                {
-                    try
+                    _logger.LogInformation("Refreshing expired access token");
+                    var refreshedToken = await RefreshAccessTokenAsync(_currentToken.RefreshToken, _config.ClientId, _config.ClientSecret);
+                    if (refreshedToken != null)
                     {
-                        var refreshedToken = await RefreshTokenAsync(storedToken.RefreshToken, cancellationToken);
-                        await _tokenStorage.SetTokenAsync(httpContext, refreshedToken, cancellationToken);
                         return refreshedToken.AccessToken;
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to refresh stored token");
-                        await _tokenStorage.RemoveTokenAsync(httpContext, cancellationToken);
-                    }
-                }
-            }
-
-            // Fall back to in-memory token
-            if (_currentToken?.IsValid == true)
-            {
-                return _currentToken.AccessToken;
-            }
-
-            if (_currentToken?.RefreshToken != null)
-            {
-                try
-                {
-                    var refreshedToken = await RefreshTokenAsync(_currentToken.RefreshToken, cancellationToken);
-                    if (_tokenStorage != null)
-                    {
-                        await _tokenStorage.SetTokenAsync(httpContext, refreshedToken, cancellationToken);
-                    }
-                    return refreshedToken.AccessToken;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to refresh token");
+                    _currentToken = null; // Clear invalid token
                 }
             }
 
-            throw new AuthenticationException("No valid access token available. Please re-authenticate.");
+            // No valid token available - authentication required
+            throw new AuthenticationException(
+                "No valid access token available. Please authenticate by redirecting to the authorization URL.");
         }
         finally
         {
             _tokenSemaphore.Release();
         }
-    }
-
-    public void SetToken(TokenDto token)
-    {
-        _currentToken = token;
-        _logger.LogDebug("Token set manually. Expires at: {ExpiresAt}", token.ExpiresAt);
-    }
-
-    public async Task SetTokenAsync(string userName, TokenDto token, CancellationToken cancellationToken = default)
-    {
-        _currentToken = token;
-        
-        if (_tokenStorage != null)
-        {
-            await _tokenStorage.SetTokenAsync(userName, token, cancellationToken);
-        }
-        
-        _logger.LogDebug("Token set for user: {UserName}. Expires at: {ExpiresAt}", userName, token.ExpiresAt);
-    }
-
-    public async Task SetTokenAsync(HttpContext httpContext, TokenDto token, CancellationToken cancellationToken = default)
-    {
-        _currentToken = token;
-        
-        if (_tokenStorage != null)
-        {
-            await _tokenStorage.SetTokenAsync(httpContext, token, cancellationToken);
-        }
-        
-        _logger.LogDebug("Token set via HttpContext. Expires at: {ExpiresAt}", token.ExpiresAt);
-    }
-
-    public async Task RemoveTokenAsync(string userName, CancellationToken cancellationToken = default)
-    {
-        _currentToken = null;
-        
-        if (_tokenStorage != null)
-        {
-            await _tokenStorage.RemoveTokenAsync(userName, cancellationToken);
-        }
-        
-        _logger.LogDebug("Token removed for user: {UserName}", userName);
-    }
-
-    public async Task RemoveTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
-    {
-        _currentToken = null;
-        
-        if (_tokenStorage != null)
-        {
-            await _tokenStorage.RemoveTokenAsync(httpContext, cancellationToken);
-        }
-        
-        _logger.LogDebug("Token removed via HttpContext");
-    }
-
-    public TokenDto? GetCurrentToken()
-    {
-        return _currentToken;
-    }
-
-    public async Task<TokenDto?> GetCurrentTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
-    {
-        if (_tokenStorage != null)
-        {
-            var storedToken = await _tokenStorage.GetTokenAsync(httpContext, cancellationToken);
-            if (storedToken != null)
-            {
-                _currentToken = storedToken;
-                return storedToken;
-            }
-        }
-        
-        return _currentToken;
     }
 }
 

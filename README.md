@@ -1,101 +1,56 @@
-# Romania EFactura Library v2.0.0
+# Romania EFactura Library
 
-A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF. Now with flexible token storage and enhanced security features.
-
-## 🚀 What's New in v2.0.0
-
-- **🔄 Flexible Token Storage**: Choose between MemoryCache, Cookie, or custom storage
-- **📝 CIF as Parameters**: CIF is now passed as method parameters instead of configuration
-- **🛡️ Enhanced Security**: Secure cookie options and automatic token cleanup
-- **� Comprehensive Examples**: Complete controller examples for all operations
-- **🔧 Better API Design**: Internal API client, cleaner public interface
-- **🧪 Extensive Testing**: Comprehensive unit test coverage
-
-## 🚀 Quick Links
-
-- **📋 [Token Storage Guide](TokenStorageGuide.md)** - Complete token management guide
-- **⚙️ [Configuration Guide](CONFIGURATION_GUIDE.md)** - All configuration options  
-- **📦 [Publishing Guide](PUBLISHING_GUIDE.md)** - NuGet publishing instructions
-- **📊 [Project Summary](PROJECT_SUMMARY.md)** - Complete project overview
-- **🔗 [Example Controllers](Examples/Controllers/)** - Ready-to-use API controllers
+A comprehensive C# library for integrating with the Romanian EFactura (SPV - Spatiu Privat Virtual) system from ANAF.
 
 ## Overview
 
 This library provides a complete solution for:
-- **🔐 OAuth2 Authentication** with flexible token storage (MemoryCache/Cookie)
-- **📄 UBL 2.1 XML** invoice creation and validation
-- **🌐 API Integration** with ANAF test and production environments
-- **📋 Invoice Management** (upload, download, status tracking, bulk operations)
-- **🔄 XML Processing** with proper namespace handling and validation
-- **🛡️ Security Features** with automatic token refresh and secure storage
+- **Authentication** with ANAF using OAuth2 and digital certificates
+- **UBL 2.1 XML** invoice creation and validation
+- **API Integration** with ANAF test and production environments
+- **Invoice Management** (upload, download, status tracking)
+- **XML Processing** with proper namespace handling and validation
 
-## 📁 Repository Structure
+## Projects Structure
 
-- **`RomaniaEFacturaLibrary/`** - Main library with all EFactura functionality
-  - `Services/TokenStorage/` - Flexible token storage implementations
-  - `Services/Api/` - Internal ANAF API client (now internal)
-  - `Services/` - Public EFactura client and services
-- **`Examples/Controllers/`** - Complete controller examples
-  - `AuthenticationController.cs` - OAuth2 authentication flow
-  - `InvoiceController.cs` - Invoice validation and upload
-  - `InvoiceManagementController.cs` - Download and management
-- **`RomaniaEFacturaLibrary.Tests/`** - Comprehensive test suite
-  - `TokenStorage/` - Token storage service tests
-  - `Services/` - Client and service tests
-- **`RomaniaEFacturaConsole/`** - Interactive console application
-- **Documentation**:
-  - `TokenStorageGuide.md` - Complete token storage guide
-  - `IMPLEMENTATION_GUIDE.md` - Step-by-step implementation
-  - `CONFIGURATION_GUIDE.md` - Configuration reference
+- **`RomaniaEFacturaLibrary`** - Main library with all EFactura functionality
+- **`RomaniaEFacturaConsole`** - Interactive console application for testing
+- **`RomaniaEFacturaLibrary.Tests`** - Comprehensive unit test suite
 
-## ✨ Features
+## Features
 
-### 🔐 Authentication & Token Management
-- **OAuth2 Authorization Flow** with ANAF
-- **Flexible Token Storage**:
-  - MemoryCache (server-side, fast)
-  - Cookie (client-side, persistent)
-  - Custom storage (database, Redis, etc.)
-- **Automatic Token Refresh** with 5-minute buffer
-- **User-Isolated Storage** based on HttpContext
-- **Secure Cookie Options** (HttpOnly, Secure, SameSite)
+### 🔐 Authentication
+- OAuth2 authentication with digital certificates via browser
+- JWT token support with automatic refresh
+- Support for test and production environments
+- ClientId/ClientSecret configuration from ANAF registration
 
 ### 📄 UBL 2.1 XML Support
 - Complete UBL 2.1 invoice models
 - Proper XML serialization/deserialization
 - Romanian EFactura-specific customizations
 - XML validation and formatting
-- PDF conversion support
 
 ### 🌐 ANAF API Integration
-- **Upload Invoices** to ANAF SPV with validation
-- **Download Invoices** in multiple formats (XML, PDF, raw ZIP)
-- **Status Tracking** with real-time monitoring
-- **Bulk Operations** for multiple invoice management
-- **Search and Filter** invoices by criteria
-- Support for test and production environments
-
-### 🔧 Developer Experience
-- **Comprehensive Examples** with ready-to-use controllers
-- **Extensive Documentation** and usage guides
-- **Unit Test Coverage** for all major components
-- **Dependency Injection** support with multiple configuration options
-- **Internal API Design** - clean public interface
+- Upload invoices to ANAF SPV
+- Check upload status and validation results
+- Download invoices and attachments
 - List recent invoices with filtering
 
-## 🚀 Quick Start
+### 🏗️ ASP.NET Core Ready
+- Dependency injection support
+- Configuration-based setup
+- Logging integration
+- Easy integration with web applications
+
+## Quick Start
 
 ### 1. Installation
 
-Install via NuGet Package Manager:
+Add the library to your project:
 
 ```xml
-<PackageReference Include="RomaniaEFacturaLibrary" Version="2.0.0" />
-```
-
-Or via Package Manager Console:
-```powershell
-Install-Package RomaniaEFacturaLibrary -Version 2.0.0
+<PackageReference Include="RomaniaEFacturaLibrary" Version="1.0.0" />
 ```
 
 ### 2. Configuration
@@ -105,173 +60,154 @@ Configure in `appsettings.json`:
 ```json
 {
   "EFactura": {
-    "BaseUrl": "https://api.anaf.ro/prod/FCTEL/rest",
-    "ClientId": "your-anaf-client-id",
-    "ClientSecret": "your-anaf-client-secret", 
-    "RedirectUri": "https://yourapp.com/auth/callback",
-    "Scope": "efactura"
+    "Environment": "Test",
+    "ClientId": "YOUR_CLIENT_ID_FROM_ANAF_REGISTRATION",
+    "ClientSecret": "YOUR_CLIENT_SECRET_FROM_ANAF_REGISTRATION",
+    "RedirectUri": "https://localhost:7000/efactura-oauth",
+    "Cif": "YOUR_COMPANY_CIF_HERE",
+    "TimeoutSeconds": 30
   }
 }
 ```
 
-### 3. Service Registration
+### 3. Dependency Injection Setup
 
-Choose your preferred token storage method:
-
-#### Option A: MemoryCache Storage (Default)
 ```csharp
 // In Program.cs
 builder.Services.AddEFacturaServices(builder.Configuration);
-// or
-builder.Services.AddEFacturaServicesWithMemoryCache(config =>
+
+// Or with custom configuration
+builder.Services.AddEFacturaServices(options =>
 {
-    config.BaseUrl = "https://api.anaf.ro/prod/FCTEL/rest";
-    config.ClientId = "your-client-id";
-    config.ClientSecret = "your-client-secret";
-    config.RedirectUri = "https://yourapp.com/auth/callback";
+    options.Environment = EFacturaEnvironment.Test;
+    options.ClientId = "your-client-id";
+    options.ClientSecret = "your-client-secret";
+    options.RedirectUri = "https://yourapp.com/oauth-callback";
+    options.Cif = "12345678";
 });
 ```
 
-#### Option B: Cookie Storage
+### 4. OAuth2 Authentication (Required)
+
+The library uses OAuth2 Authorization Code flow with browser-based authentication:
+
 ```csharp
-// In Program.cs
-builder.Services.AddEFacturaServicesWithCookieStorage(builder.Configuration);
-```
-
-#### Option C: Custom Storage
-```csharp
-// Implement your own storage
-public class DatabaseTokenStorage : ITokenStorageService
-{
-    // Your implementation...
-}
-
-// Register in DI
-builder.Services.AddEFacturaServicesWithCustomStorage<DatabaseTokenStorage>(config => 
-{
-    // Configuration...
-});
-```
-
-### 4. Basic Usage
-
-**Note**: In v2.0.0, CIF is now passed as a parameter to methods instead of configuration.
-
-#### Authentication Flow
-```csharp
-[ApiController]
 public class AuthController : ControllerBase
 {
     private readonly IAuthenticationService _authService;
-    
+
     public AuthController(IAuthenticationService authService)
     {
         _authService = authService;
     }
-    
+
     [HttpGet("login")]
     public IActionResult Login()
     {
-        var authUrl = _authService.GetAuthorizationUrl(
-            clientId: "your-client-id",
-            redirectUri: "https://yourapp.com/auth/callback",
-            scope: "efactura"
-        );
+        // Step 1: Redirect user to ANAF OAuth page
+        var authUrl = _authService.GetAuthorizationUrl("efactura");
         return Redirect(authUrl);
     }
-    
-    [HttpGet("callback")]
-    public async Task<IActionResult> Callback(string code)
+
+    [HttpGet("oauth-callback")]
+    public async Task<IActionResult> OAuthCallback(string code, string state)
     {
-        var token = await _authService.GetAccessTokenAsync(
-            code: code,
-            clientId: "your-client-id",
-            clientSecret: "your-client-secret",
-            redirectUri: "https://yourapp.com/auth/callback"
-        );
+        // Step 2: Exchange authorization code for JWT token
+        var tokenResponse = await _authService.ExchangeCodeForTokenAsync(code);
         
-        // Token is automatically stored
-        return Ok("Authentication successful");
+        if (tokenResponse != null)
+        {
+            // Authentication successful - redirect to main app
+            return RedirectToAction("Dashboard");
+        }
+        
+        return BadRequest("Authentication failed");
     }
 }
 ```
 
-#### Invoice Operations
+### 5. Using the EFactura Client
+
 ```csharp
-[ApiController]
-[Authorize]
 public class InvoiceController : ControllerBase
 {
     private readonly IEFacturaClient _eFacturaClient;
-    
+
     public InvoiceController(IEFacturaClient eFacturaClient)
     {
         _eFacturaClient = eFacturaClient;
     }
-    
-    [HttpPost("validate")]
-    public async Task<IActionResult> ValidateInvoice([FromBody] ValidateRequest request)
-    {
-        var result = await _eFacturaClient.ValidateInvoiceAsync(
-            cif: request.Cif,  // CIF now required as parameter
-            xmlContent: request.XmlContent
-        );
-        
-        return Ok(result);
-    }
-    
+
     [HttpPost("upload")]
-    public async Task<IActionResult> UploadInvoice([FromBody] UploadRequest request)
+    public async Task<IActionResult> UploadInvoice([FromBody] UblInvoice invoice)
     {
-        var result = await _eFacturaClient.UploadInvoiceAsync(
-            cif: request.Cif,
-            xmlContent: request.XmlContent
-        );
-        
-        return Ok(result);
+        try
+        {
+            // Validate invoice
+            var validation = await _eFacturaClient.ValidateInvoiceAsync(invoice);
+            if (!validation.Success)
+            {
+                return BadRequest(validation.Errors);
+            }
+
+            // Upload to ANAF
+            var result = await _eFacturaClient.UploadInvoiceAsync(invoice);
+            return Ok(new { UploadId = result.UploadId });
+        }
+        catch (AuthenticationException)
+        {
+            return Unauthorized("Please authenticate first");
+        }
     }
-    
-    [HttpGet("list")]
-    public async Task<IActionResult> GetInvoices([FromQuery] string cif, [FromQuery] int days = 30)
+
+    [HttpGet("invoices")]
+    public async Task<IActionResult> GetInvoices(DateTime? from = null, DateTime? to = null)
     {
-        var messages = await _eFacturaClient.GetInvoicesAsync(
-            cif: cif,
-            days: days
-        );
-        
-        return Ok(messages);
+        try
+        {
+            var invoices = await _eFacturaClient.GetInvoicesAsync(from, to);
+            return Ok(invoices);
+        }
+        catch (AuthenticationException)
+        {
+            return Unauthorized("Please authenticate first");
+        }
     }
-    
+
     [HttpGet("download/{messageId}")]
     public async Task<IActionResult> DownloadInvoice(string messageId)
     {
-        var invoice = await _eFacturaClient.DownloadInvoiceAsync(messageId);
-        return Ok(invoice);
-    }
-    
-    [HttpGet("download/{messageId}/pdf")]
-    public async Task<IActionResult> DownloadPdf(string messageId)
-    {
-        var pdfBytes = await _eFacturaClient.DownloadInvoicePdfAsync(messageId);
-        return File(pdfBytes, "application/pdf", $"invoice_{messageId}.pdf");
-    }
-    
-    [HttpGet("messages")]
-    public async Task<IActionResult> GetMessages([FromQuery] string cif, [FromQuery] int days = 30)
-    {
-        var messages = await _eFacturaClient.GetMessagesAsync(cif, days);
-        return Ok(messages);
+        try
+        {
+            var invoice = await _eFacturaClient.DownloadInvoiceAsync(messageId);
+            return Ok(invoice);
+        }
+        catch (AuthenticationException)
+        {
+            return Unauthorized("Please authenticate first");
+        }
     }
 }
 ```
 
-## 📚 Complete Examples
+## Authentication Flow
 
-For comprehensive examples, see the [Examples/Controllers](Examples/Controllers/) directory:
+The library implements the correct ANAF OAuth2 flow:
 
-- **[AuthenticationController.cs](Examples/Controllers/AuthenticationController.cs)** - Complete OAuth2 flow implementation
-- **[InvoiceController.cs](Examples/Controllers/InvoiceController.cs)** - Invoice validation and upload examples  
-- **[InvoiceManagementController.cs](Examples/Controllers/InvoiceManagementController.cs)** - Download, search, and management examples
+1. **Redirect to ANAF**: Call `GetAuthorizationUrl()` and redirect user's browser
+2. **Certificate Selection**: ANAF prompts user to insert USB certificate device
+3. **Authorization Code**: ANAF redirects back with authorization code
+4. **Token Exchange**: Call `ExchangeCodeForTokenAsync()` to get JWT tokens
+5. **API Access**: Use authenticated client for all subsequent operations
+
+## Configuration Requirements
+
+To use this library, you need:
+
+1. **ANAF Application Registration**: Register your application with ANAF to get ClientId and ClientSecret
+2. **Valid CIF**: Company fiscal identification code registered with ANAF for EFactura
+3. **Digital Certificate**: For production use (development can use test environment)
+4. **Redirect URI**: Must be registered with ANAF and match exactly
 
 ## Testing
 
@@ -290,36 +226,31 @@ dotnet run
 
 ## Requirements
 
-- **.NET 9.0** or later
-- **ANAF Application Registration** (ClientId and ClientSecret)
-- **Registered Redirect URI** with ANAF for OAuth callback
+- **.NET 8.0** or later (supports .NET 8 and .NET 9)
+- **Valid ANAF Application Registration** with ClientId/ClientSecret
+- **Digital Certificate** from a qualified provider for production use
+- **Valid CIF** registered with ANAF for EFactura
 
 ## Key Dependencies
 
 - `Microsoft.Extensions.DependencyInjection` - Dependency injection
 - `Microsoft.Extensions.Logging` - Logging framework
 - `Microsoft.Extensions.Http` - HTTP client factory
-- `System.Security.Cryptography.X509Certificates` - Certificate handling
 - `System.Text.Json` - JSON serialization
 
-## Build Status
+## Error Handling
 
-✅ **Solution builds successfully**  
-✅ **All 29 unit tests pass**  
-✅ **Release configuration ready**  
-✅ **Multi-target support** (.NET 8.0 and .NET 9.0)  
-✅ **NuGet package ready**
+The library provides comprehensive error handling:
 
-## 🔗 Repository Information
+- `AuthenticationException`: OAuth2 authentication failures
+- `EFacturaApiException`: API communication errors
+- `ValidationException`: Invoice validation errors
 
-- **GitHub Repository**: [https://github.com/lucianbumb/RomaniaEFacturaSolution](https://github.com/lucianbumb/RomaniaEFacturaSolution)
-- **Package ID**: `RomaniaEFacturaLibrary`
-- **Current Version**: `2.0.0`
-- **License**: MIT
+Always wrap API calls in try-catch blocks to handle authentication expiration.
 
 ## Contributing
 
-This library follows Romanian EFactura specifications and UBL 2.1 standards.
+This library follows Romanian EFactura specifications and OAuth2 standards.
 
 ## License
 

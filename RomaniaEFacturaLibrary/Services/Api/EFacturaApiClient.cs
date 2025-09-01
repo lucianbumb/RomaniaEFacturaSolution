@@ -12,24 +12,24 @@ using System.Text.Json;
 namespace RomaniaEFacturaLibrary.Services.Api;
 
 /// <summary>
-/// Main client for interacting with ANAF EFactura API - Internal use only
+/// Main client for interacting with ANAF EFactura API
 /// </summary>
-internal interface IEFacturaApiClient
+public interface IEFacturaApiClient
 {
     /// <summary>
     /// Validates an invoice XML without uploading it
     /// </summary>
-    Task<ValidationResult> ValidateInvoiceAsync(string xmlContent, string standard = "FACT1", CancellationToken cancellationToken = default);
+    Task<ValidationResult> ValidateInvoiceAsync(string xmlContent, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Uploads an invoice to SPV
     /// </summary>
-    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, string standard = "FACT1", CancellationToken cancellationToken = default);
+    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Uploads an invoice XML directly
     /// </summary>
-    Task<UploadResponse> UploadInvoiceXmlAsync(string xmlContent, string cif, string standard = "FACT1", CancellationToken cancellationToken = default);
+    Task<UploadResponse> UploadInvoiceXmlAsync(string xmlContent, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Gets the status of an uploaded invoice
@@ -37,9 +37,9 @@ internal interface IEFacturaApiClient
     Task<StatusResponse> GetUploadStatusAsync(string uploadId, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Gets list of messages/invoices for a specific CIF
+    /// Gets list of messages/invoices
     /// </summary>
-    Task<MessagesResponse> GetMessagesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
+    Task<MessagesResponse> GetMessagesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Downloads an invoice by ID
@@ -52,34 +52,35 @@ internal interface IEFacturaApiClient
     Task<byte[]> ConvertXmlToPdfAsync(string xmlContent, string documentType = "FACT1", CancellationToken cancellationToken = default);
 }
 
-internal class EFacturaApiClient : IEFacturaApiClient
+public class EFacturaApiClient : IEFacturaApiClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly EFacturaConfig _config;
     private readonly IAuthenticationService _authService;
     private readonly IXmlService _xmlService;
     private readonly ILogger<EFacturaApiClient> _logger;
 
     public EFacturaApiClient(
-        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
         IOptions<EFacturaConfig> config,
         IAuthenticationService authService,
         IXmlService xmlService,
         ILogger<EFacturaApiClient> logger)
     {
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _config = config.Value;
         _authService = authService;
         _xmlService = xmlService;
         _logger = logger;
     }
 
-    public async Task<ValidationResult> ValidateInvoiceAsync(string xmlContent, string cif, CancellationToken cancellationToken = default)
+    public async Task<ValidationResult> ValidateInvoiceAsync(string xmlContent, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Validating invoice XML for CIF: {Cif}", cif);
+        _logger.LogInformation("Validating invoice XML");
         
+        using var httpClient = _httpClientFactory.CreateClient();
         var content = new StringContent(xmlContent, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"{_config.BaseUrl}/validare/FACT1?cif={cif}", content, cancellationToken);
+        var response = await httpClient.PostAsync($"{_config.BaseUrl}/validare/FACT1", content, cancellationToken);
         
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         
@@ -97,26 +98,28 @@ internal class EFacturaApiClient : IEFacturaApiClient
         return result ?? new ValidationResult();
     }
 
-    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, string environment = "prod", CancellationToken cancellationToken = default)
+    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default)
     {
         var xmlContent = await _xmlService.SerializeInvoiceAsync(invoice, cancellationToken);
-        return await UploadInvoiceXmlAsync(xmlContent, cif, environment, cancellationToken);
+        return await UploadInvoiceXmlAsync(xmlContent, cancellationToken);
     }
 
-    public async Task<UploadResponse> UploadInvoiceXmlAsync(string xmlContent, string cif, string environment = "prod", CancellationToken cancellationToken = default)
+    public async Task<UploadResponse> UploadInvoiceXmlAsync(string xmlContent, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Uploading invoice to SPV for CIF: {Cif}, Environment: {Environment}", cif, environment);
+        _logger.LogInformation("Uploading invoice to SPV");
         
         // Get access token using the new authentication service
         var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
+        using var httpClient = _httpClientFactory.CreateClient();
+        
         // Prepare request
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.BaseUrl}/upload?standard=UBL&cif={cif}");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.BaseUrl}/upload?standard=UBL&cif={_config.Cif}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Content = new StringContent(xmlContent, Encoding.UTF8, "text/plain");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         
         if (!response.IsSuccessStatusCode)
@@ -138,10 +141,11 @@ internal class EFacturaApiClient : IEFacturaApiClient
         
         var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
+        using var httpClient = _httpClientFactory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/stareMesaj?id_incarcare={uploadId}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         
         if (!response.IsSuccessStatusCode)
@@ -157,22 +161,23 @@ internal class EFacturaApiClient : IEFacturaApiClient
         return result ?? new StatusResponse();
     }
 
-    public async Task<MessagesResponse> GetMessagesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
+    public async Task<MessagesResponse> GetMessagesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting messages list for CIF: {Cif}", cif);
+        _logger.LogInformation("Getting messages list");
         
         var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
-        var url = $"{_config.BaseUrl}/listaMesajeFactura?cif={cif}";
+        var url = $"{_config.BaseUrl}/listaMesajeFactura?cif={_config.Cif}";
         if (from.HasValue)
             url += $"&data_start={from.Value:yyyy-MM-dd}";
         if (to.HasValue)
             url += $"&data_sfarsit={to.Value:yyyy-MM-dd}";
         
+        using var httpClient = _httpClientFactory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         
         if (!response.IsSuccessStatusCode)
@@ -194,10 +199,11 @@ internal class EFacturaApiClient : IEFacturaApiClient
         
         var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
+        using var httpClient = _httpClientFactory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/descarcare?id={messageId}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -217,9 +223,11 @@ internal class EFacturaApiClient : IEFacturaApiClient
     {
         _logger.LogInformation("Converting XML to PDF");
         
+        using var httpClient = _httpClientFactory.CreateClient();
+        
         // This endpoint doesn't require authentication
         var content = new StringContent(xmlContent, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"https://webservicesp.anaf.ro/prod/FCTEL/rest/transformare/{documentType}", content, cancellationToken);
+        var response = await httpClient.PostAsync($"https://webservicesp.anaf.ro/prod/FCTEL/rest/transformare/{documentType}", content, cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
