@@ -31,9 +31,10 @@ public class EFacturaController : ControllerBase
     /// <summary>
     /// Dashboard showing authentication status and quick stats
     /// </summary>
+    /// <param name="cif">Company fiscal identification code (CIF) for dashboard stats (optional)</param>
     /// <returns>Dashboard information</returns>
     [HttpGet("dashboard")]
-    public async Task<IActionResult> Dashboard()
+    public async Task<IActionResult> Dashboard([FromQuery] string? cif = null)
     {
         try
         {
@@ -59,23 +60,38 @@ public class EFacturaController : ControllerBase
                 });
             }
 
-            // Get recent invoices count
-            var recentInvoices = await _eFacturaClient.GetInvoicesAsync(
-                DateTime.UtcNow.AddDays(-30), DateTime.UtcNow);
+            // Get recent invoices count if CIF is provided
+            int? recentInvoicesCount = null;
+            if (!string.IsNullOrWhiteSpace(cif))
+            {
+                try
+                {
+                    var recentInvoices = await _eFacturaClient.GetInvoicesAsync(
+                        cif, DateTime.UtcNow.AddDays(-30), DateTime.UtcNow);
+                    recentInvoicesCount = recentInvoices.Count;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to get recent invoices count for CIF {Cif}", cif);
+                    // Continue without invoice count
+                }
+            }
 
             return Ok(new
             {
                 isAuthenticated = true,
-                recentInvoicesCount = recentInvoices.Count,
+                cif,
+                recentInvoicesCount,
                 lastChecked = DateTime.UtcNow,
                 availableOperations = new[]
                 {
                     "Upload Invoice",
-                    "Download Invoices",
+                    "Download Invoices (requires CIF parameter)",
                     "Validate Invoice",
                     "Check Upload Status",
                     "Convert to PDF"
-                }
+                },
+                note = recentInvoicesCount == null ? "Provide 'cif' parameter to see recent invoices count" : null
             });
         }
         catch (Exception ex)
@@ -310,18 +326,26 @@ public class EFacturaController : ControllerBase
     }
 
     /// <summary>
-    /// Gets list of invoices for a date range
+    /// Gets list of invoices for a date range and specific CIF
     /// </summary>
+    /// <param name="cif">Company fiscal identification code (CIF) to get invoices for</param>
     /// <param name="from">Start date (optional, defaults to 30 days ago)</param>
     /// <param name="to">End date (optional, defaults to today)</param>
     /// <returns>List of invoices</returns>
     [HttpGet("invoices")]
     public async Task<IActionResult> GetInvoices(
+        [FromQuery, Required] string cif,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null)
     {
         try
         {
+            // Validate CIF parameter
+            if (string.IsNullOrWhiteSpace(cif))
+            {
+                return BadRequest(new { error = "CIF parameter is required" });
+            }
+
             // Default date range if not provided
             from ??= DateTime.UtcNow.AddDays(-30);
             to ??= DateTime.UtcNow;
@@ -340,12 +364,13 @@ public class EFacturaController : ControllerBase
             // Ensure user is authenticated
             await _authService.GetValidAccessTokenAsync();
 
-            _logger.LogInformation("Getting invoices from {From} to {To}", from, to);
+            _logger.LogInformation("Getting invoices for CIF {Cif} from {From} to {To}", cif, from, to);
 
-            var invoices = await _eFacturaClient.GetInvoicesAsync(from, to);
+            var invoices = await _eFacturaClient.GetInvoicesAsync(cif, from, to);
 
             return Ok(new
             {
+                cif,
                 dateRange = new { from, to },
                 count = invoices.Count,
                 invoices = invoices.Select(inv => new
@@ -372,7 +397,7 @@ public class EFacturaController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting invoices for date range {From} to {To}", from, to);
+            _logger.LogError(ex, "Error getting invoices for CIF {Cif} and date range {From} to {To}", cif, from, to);
             return StatusCode(500, new { error = "Failed to get invoices", details = ex.Message });
         }
     }

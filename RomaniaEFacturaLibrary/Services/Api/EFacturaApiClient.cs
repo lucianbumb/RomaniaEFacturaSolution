@@ -37,9 +37,9 @@ public interface IEFacturaApiClient
     Task<StatusResponse> GetUploadStatusAsync(string uploadId, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Gets list of messages/invoices
+    /// Gets list of messages/invoices for a specific CIF
     /// </summary>
-    Task<MessagesResponse> GetMessagesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
+    Task<MessagesResponse> GetMessagesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Downloads an invoice by ID
@@ -161,13 +161,18 @@ public class EFacturaApiClient : IEFacturaApiClient
         return result ?? new StatusResponse();
     }
 
-    public async Task<MessagesResponse> GetMessagesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
+    public async Task<MessagesResponse> GetMessagesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting messages list");
+        if (string.IsNullOrWhiteSpace(cif))
+        {
+            throw new ArgumentException("CIF parameter is required", nameof(cif));
+        }
+
+        _logger.LogInformation("Getting messages list for CIF: {Cif}", cif);
         
         var token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         
-        var url = $"{_config.BaseUrl}/listaMesajeFactura?cif={_config.Cif}";
+        var url = $"{_config.BaseUrl}/listaMesajeFactura?cif={cif}";
         if (from.HasValue)
             url += $"&data_start={from.Value:yyyy-MM-dd}";
         if (to.HasValue)
@@ -188,7 +193,7 @@ public class EFacturaApiClient : IEFacturaApiClient
 
         var result = JsonSerializer.Deserialize<MessagesResponse>(responseContent);
         
-        _logger.LogInformation("Retrieved {Count} messages", result?.Messages?.Count ?? 0);
+        _logger.LogInformation("Retrieved {Count} messages for CIF: {Cif}", result?.Messages?.Count ?? 0, cif);
         
         return result ?? new MessagesResponse();
     }

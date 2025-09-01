@@ -35,9 +35,9 @@ public interface IEFacturaClient
     Task<StatusResponse> WaitForUploadCompletionAsync(string uploadId, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Gets invoices from a date range
+    /// Gets invoices from a date range for a specific CIF
     /// </summary>
-    Task<List<UblInvoice>> GetInvoicesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
+    Task<List<UblInvoice>> GetInvoicesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Downloads an invoice and extracts the XML content
@@ -147,11 +147,16 @@ public class EFacturaClient : IEFacturaClient
         return await GetUploadStatusAsync(uploadId, cancellationToken);
     }
 
-    public async Task<List<UblInvoice>> GetInvoicesAsync(DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
+    public async Task<List<UblInvoice>> GetInvoicesAsync(string cif, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting invoices for CIF: {Cif} from {From} to {To}", _config.Cif, from, to);
+        if (string.IsNullOrWhiteSpace(cif))
+        {
+            throw new ArgumentException("CIF parameter is required", nameof(cif));
+        }
+
+        _logger.LogInformation("Getting invoices for CIF: {Cif} from {From} to {To}", cif, from, to);
         
-        var response = await _apiClient.GetMessagesAsync(from, to, cancellationToken);
+        var response = await _apiClient.GetMessagesAsync(cif, from, to, cancellationToken);
         
         var invoices = new List<UblInvoice>();
         

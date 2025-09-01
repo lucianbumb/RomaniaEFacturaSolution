@@ -204,12 +204,21 @@ class Program
     {
         Console.WriteLine("\n=== Recent Invoices ===");
         
+        Console.Write("Enter CIF (company fiscal code): ");
+        var cif = Console.ReadLine();
+        
+        if (string.IsNullOrWhiteSpace(cif))
+        {
+            Console.WriteLine("❌ CIF is required to list invoices");
+            return;
+        }
+        
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
         
-        Console.WriteLine($"Fetching invoices from {from:yyyy-MM-dd} to {to:yyyy-MM-dd}...");
+        Console.WriteLine($"Fetching invoices for CIF {cif} from {from:yyyy-MM-dd} to {to:yyyy-MM-dd}...");
         
-        var invoices = await client.GetInvoicesAsync(from, to);
+        var invoices = await client.GetInvoicesAsync(cif, from, to);
         
         if (invoices.Count == 0)
         {
