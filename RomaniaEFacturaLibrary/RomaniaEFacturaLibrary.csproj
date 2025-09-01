@@ -7,7 +7,7 @@
     <!-- NuGet Package Configuration -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RomaniaEFacturaLibrary</PackageId>
-    <PackageVersion>2.1.0</PackageVersion>
+    <PackageVersion>2.1.1</PackageVersion>
     <Authors>Romania EFactura Library Contributors</Authors>
     <Company>Open Source</Company>
     <Product>Romania EFactura Library</Product>
@@ -18,10 +18,10 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Version 2.1.0: MAJOR UPDATE - Integrated persistent token storage with MemoryCache/Cookie support, enhanced multi-tenant CIF support for all operations, completely overhauled authentication service with automatic token refresh, added flexible service registration options, and improved production-ready token management. Breaking change: CIF now required for upload/validation operations.</PackageReleaseNotes>
+    <PackageReleaseNotes>Version 2.1.1: CRITICAL FIX - Resolved dependency injection issues with IDistributedCache and session support. Added AddEFacturaServicesWithSessions() extension method for seamless setup. Fixed "Unable to resolve service for type IDistributedCache" error. Added comprehensive troubleshooting guide. All service registration methods now include required dependencies automatically.</PackageReleaseNotes>
     <Copyright>Copyright © 2025 Romania EFactura Library Contributors</Copyright>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <FileVersion>2.1.1</FileVersion>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
     <!-- Local NuGet package output directory -->
@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Session" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />

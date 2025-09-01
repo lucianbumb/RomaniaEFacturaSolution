@@ -7,17 +7,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add session support for OAuth2 state management
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-});
-
-// Register EFactura services with MemoryCache token storage
-builder.Services.AddEFacturaServices(builder.Configuration);
+// Register EFactura services with sessions (includes distributed cache automatically)
+builder.Services.AddEFacturaServicesWithSessions(builder.Configuration);
 
 var app = builder.Build();
 

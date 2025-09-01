@@ -8,6 +8,7 @@ using RomaniaEFacturaLibrary.Services.Xml;
 using RomaniaEFacturaLibrary.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace RomaniaEFacturaLibrary.Extensions;
 
@@ -28,6 +29,7 @@ public static class ServiceCollectionExtensions
 
         // Add required dependencies
         services.AddMemoryCache();
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
@@ -55,6 +57,7 @@ public static class ServiceCollectionExtensions
 
         // Add required dependencies
         services.AddMemoryCache();
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
@@ -71,6 +74,29 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Adds EFactura services with sessions configured for OAuth2 state management
+    /// </summary>
+    public static IServiceCollection AddEFacturaServicesWithSessions(
+        this IServiceCollection services,
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        string sectionName = "EFactura")
+    {
+        // Add EFactura services first
+        services.AddEFacturaServices(configuration, sectionName);
+
+        // Add session support for OAuth2 state management
+        services.AddSession(options =>
+        {
+            options.IdleTimeout = TimeSpan.FromMinutes(30);
+            options.Cookie.HttpOnly = true;
+            options.Cookie.IsEssential = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        });
+
+        return services;
+    }
+
+    /// <summary>
     /// Adds EFactura services with Cookie-based token storage
     /// </summary>
     public static IServiceCollection AddEFacturaServicesWithCookieStorage(
@@ -81,6 +107,7 @@ public static class ServiceCollectionExtensions
         services.Configure(configureOptions);
 
         // Add required dependencies
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
@@ -107,6 +134,7 @@ public static class ServiceCollectionExtensions
         services.Configure<EFacturaConfig>(configuration.GetSection(sectionName));
 
         // Add required dependencies
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
@@ -134,6 +162,7 @@ public static class ServiceCollectionExtensions
         services.Configure(configureOptions);
 
         // Add required dependencies
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
@@ -161,6 +190,7 @@ public static class ServiceCollectionExtensions
         services.Configure<EFacturaConfig>(configuration.GetSection(sectionName));
 
         // Add required dependencies
+        services.AddDistributedMemoryCache(); // Add for session support
         services.AddHttpClient();
         services.AddHttpContextAccessor();
 
