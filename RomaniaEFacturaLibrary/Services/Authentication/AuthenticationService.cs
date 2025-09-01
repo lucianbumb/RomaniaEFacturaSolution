@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
+using Microsoft.AspNetCore.Http;
 
 namespace RomaniaEFacturaLibrary.Services.Authentication;
 
@@ -57,7 +58,7 @@ public interface IAuthenticationService
     /// <summary>
     /// Gets access token using configuration values
     /// </summary>
-    Task<TokenResponse?> ExchangeCodeForTokenAsync(string code);
+    Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string? userName = null);
     
     /// <summary>
     /// Refreshes an expired access token using the refresh token obtained previously.
@@ -72,12 +73,17 @@ public interface IAuthenticationService
     /// <summary>
     /// Gets a valid access token, refreshing if necessary
     /// </summary>
-    Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default);
+    Task<string> GetValidAccessTokenAsync(string? userName = null, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Sets the current token (used after code exchange)
     /// </summary>
-    void SetToken(TokenResponse token);
+    void SetToken(TokenResponse token, string? userName = null);
+    
+    /// <summary>
+    /// Removes stored token for a user
+    /// </summary>
+    Task RemoveTokenAsync(string? userName = null, CancellationToken cancellationToken = default);
 }
 
 public class AuthenticationService : IAuthenticationService
@@ -85,17 +91,22 @@ public class AuthenticationService : IAuthenticationService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly EFacturaConfig _config;
     private readonly ILogger<AuthenticationService> _logger;
-    private TokenResponse? _currentToken;
+    private readonly ITokenStorageService _tokenStorage;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly SemaphoreSlim _tokenSemaphore = new(1, 1);
 
     public AuthenticationService(
         IHttpClientFactory httpClientFactory,
         IOptions<EFacturaConfig> config,
-        ILogger<AuthenticationService> logger)
+        ILogger<AuthenticationService> logger,
+        ITokenStorageService tokenStorage,
+        IHttpContextAccessor? httpContextAccessor = null)
     {
         _httpClientFactory = httpClientFactory;
         _config = config.Value;
         _logger = logger;
+        _tokenStorage = tokenStorage;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     /// <summary>
@@ -181,11 +192,6 @@ public class AuthenticationService : IAuthenticationService
             // Deserialize the JSON response using System.Text.Json (modern .NET serializer)
             var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseBody);
             
-            if (tokenResponse != null)
-            {
-                _currentToken = tokenResponse;
-            }
-            
             return tokenResponse;
         }
         catch (HttpRequestException e)
@@ -206,11 +212,39 @@ public class AuthenticationService : IAuthenticationService
     }
 
     /// <summary>
-    /// Gets access token using configuration values
+    /// Gets access token using configuration values and stores it in token storage
     /// </summary>
-    public async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code)
+    public async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string? userName = null)
     {
-        return await GetAccessTokenAsync(code, _config.RedirectUri, _config.ClientId, _config.ClientSecret);
+        var tokenResponse = await GetAccessTokenAsync(code, _config.RedirectUri, _config.ClientId, _config.ClientSecret);
+        
+        if (tokenResponse != null)
+        {
+            // Store token in token storage
+            userName ??= GetCurrentUserName();
+            var tokenDto = TokenDto.FromTokenResponse(tokenResponse, userName);
+            
+            try
+            {
+                if (_httpContextAccessor?.HttpContext != null)
+                {
+                    await _tokenStorage.SetTokenAsync(_httpContextAccessor.HttpContext, tokenDto);
+                }
+                else
+                {
+                    await _tokenStorage.SetTokenAsync(userName, tokenDto);
+                }
+                
+                _logger.LogInformation("Token stored successfully for user: {UserName}", userName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to store token for user: {UserName}", userName);
+                // Continue anyway - token was successfully obtained
+            }
+        }
+        
+        return tokenResponse;
     }
 
     /// <summary>
@@ -250,11 +284,6 @@ public class AuthenticationService : IAuthenticationService
 
             var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseBody);
             
-            if (tokenResponse != null)
-            {
-                _currentToken = tokenResponse;
-            }
-            
             return tokenResponse;
         }
         catch (HttpRequestException e)
@@ -274,40 +303,107 @@ public class AuthenticationService : IAuthenticationService
         }
     }
 
-    public void SetToken(TokenResponse token)
+    public void SetToken(TokenResponse token, string? userName = null)
     {
-        _currentToken = token;
-        _logger.LogInformation("Token set manually, expires in {ExpiresIn} seconds", token.ExpiresIn);
+        userName ??= GetCurrentUserName();
+        var tokenDto = TokenDto.FromTokenResponse(token, userName);
+        
+        try
+        {
+            if (_httpContextAccessor?.HttpContext != null)
+            {
+                _tokenStorage.SetTokenAsync(_httpContextAccessor.HttpContext, tokenDto).Wait();
+            }
+            else
+            {
+                _tokenStorage.SetTokenAsync(userName, tokenDto).Wait();
+            }
+            
+            _logger.LogInformation("Token set manually for user {UserName}, expires in {ExpiresIn} seconds", userName, token.ExpiresIn);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to store token for user: {UserName}", userName);
+        }
     }
 
-    public async Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default)
+    public async Task<string> GetValidAccessTokenAsync(string? userName = null, CancellationToken cancellationToken = default)
     {
         await _tokenSemaphore.WaitAsync(cancellationToken);
         try
         {
-            // Check if we have a valid token
-            if (_currentToken?.IsValid == true)
+            userName ??= GetCurrentUserName();
+            
+            // Get token from storage
+            TokenDto? currentToken = null;
+            
+            try
             {
-                _logger.LogDebug("Using existing valid access token");
-                return _currentToken.AccessToken;
+                if (_httpContextAccessor?.HttpContext != null)
+                {
+                    currentToken = await _tokenStorage.GetTokenAsync(_httpContextAccessor.HttpContext, cancellationToken);
+                }
+                else
+                {
+                    currentToken = await _tokenStorage.GetTokenAsync(userName, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to retrieve token from storage for user: {UserName}", userName);
+            }
+
+            // Check if we have a valid token
+            if (currentToken?.IsValid == true)
+            {
+                _logger.LogDebug("Using existing valid access token for user: {UserName}", userName);
+                return currentToken.AccessToken;
             }
 
             // Try to refresh if we have a refresh token
-            if (_currentToken?.RefreshToken != null)
+            if (currentToken?.RefreshToken != null)
             {
                 try
                 {
-                    _logger.LogInformation("Refreshing expired access token");
-                    var refreshedToken = await RefreshAccessTokenAsync(_currentToken.RefreshToken, _config.ClientId, _config.ClientSecret);
+                    _logger.LogInformation("Refreshing expired access token for user: {UserName}", userName);
+                    var refreshedToken = await RefreshAccessTokenAsync(currentToken.RefreshToken, _config.ClientId, _config.ClientSecret);
                     if (refreshedToken != null)
                     {
+                        // Store the refreshed token
+                        var refreshedTokenDto = TokenDto.FromTokenResponse(refreshedToken, userName);
+                        
+                        if (_httpContextAccessor?.HttpContext != null)
+                        {
+                            await _tokenStorage.SetTokenAsync(_httpContextAccessor.HttpContext, refreshedTokenDto, cancellationToken);
+                        }
+                        else
+                        {
+                            await _tokenStorage.SetTokenAsync(userName, refreshedTokenDto, cancellationToken);
+                        }
+                        
                         return refreshedToken.AccessToken;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to refresh token");
-                    _currentToken = null; // Clear invalid token
+                    _logger.LogWarning(ex, "Failed to refresh token for user: {UserName}", userName);
+                    
+                    // Remove invalid token
+                    try
+                    {
+                        if (_httpContextAccessor?.HttpContext != null)
+                        {
+                            await _tokenStorage.RemoveTokenAsync(_httpContextAccessor.HttpContext, cancellationToken);
+                        }
+                        else
+                        {
+                            await _tokenStorage.RemoveTokenAsync(userName, cancellationToken);
+                        }
+                    }
+                    catch (Exception removeEx)
+                    {
+                        _logger.LogWarning(removeEx, "Failed to remove invalid token for user: {UserName}", userName);
+                    }
                 }
             }
 
@@ -319,6 +415,51 @@ public class AuthenticationService : IAuthenticationService
         {
             _tokenSemaphore.Release();
         }
+    }
+
+    public async Task RemoveTokenAsync(string? userName = null, CancellationToken cancellationToken = default)
+    {
+        userName ??= GetCurrentUserName();
+        
+        try
+        {
+            if (_httpContextAccessor?.HttpContext != null)
+            {
+                await _tokenStorage.RemoveTokenAsync(_httpContextAccessor.HttpContext, cancellationToken);
+            }
+            else
+            {
+                await _tokenStorage.RemoveTokenAsync(userName, cancellationToken);
+            }
+            
+            _logger.LogInformation("Token removed for user: {UserName}", userName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to remove token for user: {UserName}", userName);
+        }
+    }
+
+    private string GetCurrentUserName()
+    {
+        // Try to get from HttpContext first
+        if (_httpContextAccessor?.HttpContext?.User?.Identity?.IsAuthenticated == true)
+        {
+            var user = _httpContextAccessor.HttpContext.User;
+            var userName = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ??
+                          user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                          user.FindFirst("preferred_username")?.Value ??
+                          user.FindFirst("email")?.Value ??
+                          user.Identity.Name;
+
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                return userName;
+            }
+        }
+        
+        // Fallback to default user for non-web scenarios
+        return "default_user";
     }
 }
 

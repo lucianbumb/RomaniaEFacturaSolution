@@ -15,14 +15,14 @@ namespace RomaniaEFacturaLibrary.Services;
 public interface IEFacturaClient
 {
     /// <summary>
-    /// Validates an invoice before uploading
+    /// Validates an invoice before uploading for a specific CIF
     /// </summary>
-    Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default);
+    Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Uploads an invoice to SPV
+    /// Uploads an invoice to SPV for a specific CIF
     /// </summary>
-    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default);
+    Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Gets the status of an uploaded invoice
@@ -74,9 +74,14 @@ public class EFacturaClient : IEFacturaClient
         _logger = logger;
     }
 
-    public async Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default)
+    public async Task<ValidationResult> ValidateInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Validating invoice {InvoiceId} for CIF: {Cif}", invoice.Id, _config.Cif);
+        if (string.IsNullOrWhiteSpace(cif))
+        {
+            throw new ArgumentException("CIF parameter is required", nameof(cif));
+        }
+
+        _logger.LogInformation("Validating invoice {InvoiceId} for CIF: {Cif}", invoice.Id, cif);
         
         // First validate locally
         var xmlContent = await _xmlService.SerializeInvoiceAsync(invoice, cancellationToken);
@@ -93,22 +98,27 @@ public class EFacturaClient : IEFacturaClient
         }
         
         // Then validate with ANAF
-        return await _apiClient.ValidateInvoiceAsync(xmlContent, cancellationToken);
+        return await _apiClient.ValidateInvoiceAsync(xmlContent, cif, cancellationToken);
     }
 
-    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, CancellationToken cancellationToken = default)
+    public async Task<UploadResponse> UploadInvoiceAsync(UblInvoice invoice, string cif, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Uploading invoice {InvoiceId} for CIF: {Cif}", invoice.Id, _config.Cif);
+        if (string.IsNullOrWhiteSpace(cif))
+        {
+            throw new ArgumentException("CIF parameter is required", nameof(cif));
+        }
+
+        _logger.LogInformation("Uploading invoice {InvoiceId} for CIF: {Cif}", invoice.Id, cif);
         
         // Validate first
-        var validation = await ValidateInvoiceAsync(invoice, cancellationToken);
+        var validation = await ValidateInvoiceAsync(invoice, cif, cancellationToken);
         if (!validation.Success)
         {
             var errors = string.Join(", ", validation.Errors.Select(e => e.Message));
             throw new InvalidOperationException($"Invoice validation failed: {errors}");
         }
         
-        return await _apiClient.UploadInvoiceAsync(invoice, cancellationToken);
+        return await _apiClient.UploadInvoiceAsync(invoice, cif, cancellationToken);
     }
 
     public async Task<StatusResponse> GetUploadStatusAsync(string uploadId, CancellationToken cancellationToken = default)

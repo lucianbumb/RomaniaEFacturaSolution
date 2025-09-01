@@ -69,4 +69,37 @@ public class TokenDto
     /// </summary>
     [JsonIgnore]
     public TimeSpan TimeToExpiry => ExpiresAt - DateTime.UtcNow;
+
+    /// <summary>
+    /// Converts TokenResponse to TokenDto
+    /// </summary>
+    public static TokenDto FromTokenResponse(TokenResponse tokenResponse, string? userName = null)
+    {
+        return new TokenDto
+        {
+            AccessToken = tokenResponse.AccessToken,
+            RefreshToken = tokenResponse.RefreshToken,
+            TokenType = tokenResponse.TokenType,
+            ExpiresIn = tokenResponse.ExpiresIn,
+            Scope = tokenResponse.Scope,
+            CreatedAt = tokenResponse.CreatedAt,
+            UserName = userName ?? string.Empty
+        };
+    }
+
+    /// <summary>
+    /// Converts TokenDto to TokenResponse
+    /// </summary>
+    public TokenResponse ToTokenResponse()
+    {
+        return new TokenResponse
+        {
+            AccessToken = AccessToken,
+            RefreshToken = RefreshToken,
+            TokenType = TokenType,
+            ExpiresIn = ExpiresIn,
+            Scope = Scope,
+            CreatedAt = CreatedAt
+        };
+    }
 }

@@ -7,7 +7,7 @@
     <!-- NuGet Package Configuration -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RomaniaEFacturaLibrary</PackageId>
-    <PackageVersion>2.0.1</PackageVersion>
+    <PackageVersion>2.1.0</PackageVersion>
     <Authors>Romania EFactura Library Contributors</Authors>
     <Company>Open Source</Company>
     <Product>Romania EFactura Library</Product>
@@ -18,10 +18,10 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Version 2.0.1: Fixed dependency injection issues, corrected OAuth2 authentication flow with proper ClientId/ClientSecret configuration, added comprehensive example controllers (AuthController, EFacturaController, ExamplesController), fixed all unit tests, eliminated build warnings, and improved documentation with step-by-step integration guides.</PackageReleaseNotes>
+    <PackageReleaseNotes>Version 2.1.0: MAJOR UPDATE - Integrated persistent token storage with MemoryCache/Cookie support, enhanced multi-tenant CIF support for all operations, completely overhauled authentication service with automatic token refresh, added flexible service registration options, and improved production-ready token management. Breaking change: CIF now required for upload/validation operations.</PackageReleaseNotes>
     <Copyright>Copyright © 2025 Romania EFactura Library Contributors</Copyright>
-    <AssemblyVersion>2.0.1</AssemblyVersion>
-    <FileVersion>2.0.1</FileVersion>
+    <AssemblyVersion>2.1.0</AssemblyVersion>
+    <FileVersion>2.1.0</FileVersion>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
     <!-- Local NuGet package output directory -->
@@ -43,6 +43,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
     <PackageReference Include="System.Security.Cryptography.X509Certificates" Version="4.3.2" />
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
     <PackageReference Include="System.Xml.XmlSerializer" Version="4.3.0" />

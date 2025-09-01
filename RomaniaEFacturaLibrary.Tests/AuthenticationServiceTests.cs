@@ -5,6 +5,7 @@ using RomaniaEFacturaLibrary.Configuration;
 using RomaniaEFacturaLibrary.Models.Authentication;
 using RomaniaEFacturaLibrary.Services.Authentication;
 using System.Net;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace RomaniaEFacturaLibrary.Tests;
 
@@ -13,6 +14,7 @@ public class AuthenticationServiceTests
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
     private readonly IOptions<EFacturaConfig> _config;
     private readonly ILogger<AuthenticationService> _logger;
+    private readonly Mock<ITokenStorageService> _tokenStorageMock;
     private readonly AuthenticationService _authService;
 
     public AuthenticationServiceTests()
@@ -32,7 +34,13 @@ public class AuthenticationServiceTests
         });
         
         _logger = Mock.Of<ILogger<AuthenticationService>>();
-        _authService = new AuthenticationService(_httpClientFactoryMock.Object, _config, _logger);
+        _tokenStorageMock = new Mock<ITokenStorageService>();
+        
+        _authService = new AuthenticationService(
+            _httpClientFactoryMock.Object, 
+            _config, 
+            _logger,
+            _tokenStorageMock.Object);
     }
 
     [Fact]
@@ -103,6 +111,10 @@ public class AuthenticationServiceTests
     [Fact]
     public async Task GetValidAccessTokenAsync_NoToken_ThrowsAuthenticationException()
     {
+        // Arrange - setup token storage to return null
+        _tokenStorageMock.Setup(x => x.GetTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync((TokenDto?)null);
+
         // Act & Assert
         await Assert.ThrowsAsync<AuthenticationException>(
             () => _authService.GetValidAccessTokenAsync());
@@ -142,14 +154,16 @@ public class AuthenticationServiceTests
     public async Task GetValidAccessTokenAsync_ValidToken_ReturnsToken()
     {
         // Arrange
-        var token = new TokenResponse
+        var validTokenDto = new TokenDto
         {
             AccessToken = "valid-token",
             ExpiresIn = 3600,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UserName = "default_user"
         };
         
-        _authService.SetToken(token);
+        _tokenStorageMock.Setup(x => x.GetTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync(validTokenDto);
 
         // Act
         var accessToken = await _authService.GetValidAccessTokenAsync();
