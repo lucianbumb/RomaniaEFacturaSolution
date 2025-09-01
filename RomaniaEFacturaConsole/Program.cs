@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using RomaniaEFacturaLibrary.Extensions;
 using RomaniaEFacturaLibrary.Models.Ubl;
 using RomaniaEFacturaLibrary.Services;
+using RomaniaEFacturaLibrary.Services.Authentication;
 
 namespace RomaniaEFacturaConsole;
 
@@ -42,9 +43,15 @@ class Program
 
             // Get the EFactura client
             var eFacturaClient = host.Services.GetRequiredService<IEFacturaClient>();
+            var authService = host.Services.GetRequiredService<IAuthenticationService>();
+
+            Console.WriteLine("\n⚠️  AUTHENTICATION REQUIRED");
+            Console.WriteLine("This console app demonstrates the library functionality.");
+            Console.WriteLine("For OAuth2 authentication, please use the web controllers.");
+            Console.WriteLine("Some operations will fail without proper authentication.\n");
 
             // Show menu
-            await ShowMenuAsync(eFacturaClient, logger);
+            await ShowMenuAsync(eFacturaClient, authService, logger);
         }
         catch (Exception ex)
         {
@@ -56,17 +63,19 @@ class Program
         Console.ReadKey();
     }
 
-    private static async Task ShowMenuAsync(IEFacturaClient client, ILogger logger)
+    private static async Task ShowMenuAsync(IEFacturaClient client, IAuthenticationService authService, ILogger logger)
     {
         while (true)
         {
             Console.WriteLine("\n=== EFactura Operations ===");
-            Console.WriteLine("1. Create and validate sample invoice");
-            Console.WriteLine("2. Upload sample invoice");
-            Console.WriteLine("3. Check upload status");
-            Console.WriteLine("4. List recent invoices");
-            Console.WriteLine("5. Download invoice");
-            Console.WriteLine("6. Convert invoice to PDF");
+            Console.WriteLine("1. Create and validate sample invoice (requires auth)");
+            Console.WriteLine("2. Upload sample invoice (requires auth)");
+            Console.WriteLine("3. Check upload status (requires auth)");
+            Console.WriteLine("4. List recent invoices (requires auth)");
+            Console.WriteLine("5. Download invoice (requires auth)");
+            Console.WriteLine("6. Convert invoice to PDF (requires auth)");
+            Console.WriteLine("7. Show OAuth URLs");
+            Console.WriteLine("8. Create sample invoice (offline)");
             Console.WriteLine("0. Exit");
             Console.Write("\nSelect option: ");
 
@@ -94,6 +103,12 @@ class Program
                     case "6":
                         await ConvertToPdfAsync(client, logger);
                         break;
+                    case "7":
+                        ShowOAuthUrls(authService);
+                        break;
+                    case "8":
+                        CreateSampleInvoiceOffline();
+                        break;
                     case "0":
                         Console.WriteLine("Goodbye!");
                         return;
@@ -102,9 +117,15 @@ class Program
                         break;
                 }
             }
+            catch (AuthenticationException ex)
+            {
+                Console.WriteLine($"❌ Authentication Error: {ex.Message}");
+                Console.WriteLine("💡 Use option 7 to see OAuth authentication URLs");
+                logger.LogWarning("Authentication required for operation");
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                Console.WriteLine($"❌ Error: {ex.Message}");
                 logger.LogError(ex, "Operation failed");
             }
         }
@@ -131,18 +152,9 @@ class Program
         else
         {
             Console.WriteLine("❌ Invoice validation failed:");
-            foreach (var error in validation.Errors)
+            foreach (var error in validation.Errors ?? new List<RomaniaEFacturaLibrary.Models.Api.ValidationError>())
             {
                 Console.WriteLine($"  - {error.Message}");
-            }
-        }
-
-        if (validation.Warnings.Count > 0)
-        {
-            Console.WriteLine("⚠️ Warnings:");
-            foreach (var warning in validation.Warnings)
-            {
-                Console.WriteLine($"  - {warning.Message}");
             }
         }
     }
@@ -156,24 +168,17 @@ class Program
         Console.WriteLine("Uploading invoice to SPV...");
         var uploadResponse = await client.UploadInvoiceAsync(invoice);
 
-        if (uploadResponse.IsSuccess)
+        Console.WriteLine($"✅ Invoice uploaded successfully!");
+        Console.WriteLine($"Upload ID: {uploadResponse.UploadId}");
+        
+        // Wait for processing
+        Console.WriteLine("Waiting for processing...");
+        var finalStatus = await client.WaitForUploadCompletionAsync(uploadResponse.UploadId);
+        
+        Console.WriteLine($"Final status: {finalStatus.Status}");
+        if (!string.IsNullOrEmpty(finalStatus.Message))
         {
-            Console.WriteLine($"✅ Invoice uploaded successfully!");
-            Console.WriteLine($"Upload ID: {uploadResponse.UploadId}");
-            
-            // Wait for processing
-            Console.WriteLine("Waiting for processing...");
-            var finalStatus = await client.WaitForUploadCompletionAsync(uploadResponse.UploadId);
-            
-            Console.WriteLine($"Final status: {finalStatus.Status}");
-            if (!string.IsNullOrEmpty(finalStatus.Details))
-            {
-                Console.WriteLine($"Details: {finalStatus.Details}");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"❌ Upload failed: {uploadResponse.Error}");
+            Console.WriteLine($"Details: {finalStatus.Message}");
         }
     }
 
@@ -193,25 +198,6 @@ class Program
         
         Console.WriteLine($"Status: {status.Status}");
         Console.WriteLine($"Message: {status.Message}");
-        
-        if (!string.IsNullOrEmpty(status.Details))
-        {
-            Console.WriteLine($"Details: {status.Details}");
-        }
-
-        if (status.Validation != null)
-        {
-            Console.WriteLine($"Validation success: {status.Validation.Success}");
-            
-            if (status.Validation.Errors.Count > 0)
-            {
-                Console.WriteLine("Errors:");
-                foreach (var error in status.Validation.Errors)
-                {
-                    Console.WriteLine($"  - {error.Message}");
-                }
-            }
-        }
     }
 
     private static async Task ListRecentInvoicesAsync(IEFacturaClient client, ILogger logger)
@@ -234,7 +220,7 @@ class Program
         Console.WriteLine($"Found {invoices.Count} invoices:");
         foreach (var invoice in invoices.Take(10)) // Show first 10
         {
-            Console.WriteLine($"  {invoice.Id} - {invoice.CreationDate:yyyy-MM-dd HH:mm} - {invoice.Type}");
+            Console.WriteLine($"  {invoice.Id} - {invoice.IssueDate:yyyy-MM-dd} - {invoice.DocumentCurrencyCode}");
         }
         
         if (invoices.Count > 10)
@@ -264,9 +250,6 @@ class Program
         Console.WriteLine($"Customer: {invoice.AccountingCustomerParty?.PartyLegalEntity?.RegistrationName}");
         Console.WriteLine($"Total amount: {invoice.LegalMonetaryTotal?.PayableAmount?.Value} {invoice.LegalMonetaryTotal?.PayableAmount?.CurrencyId}");
         
-        // Save to file
-        var fileName = $"invoice_{invoice.Id}_{DateTime.Now:yyyyMMdd_HHmmss}.xml";
-        // You could serialize and save here if needed
         Console.WriteLine($"Invoice data retrieved successfully.");
     }
 
@@ -285,6 +268,51 @@ class Program
         Console.WriteLine($"✅ PDF created: {fileName} ({pdfData.Length} bytes)");
     }
 
+    private static void ShowOAuthUrls(IAuthenticationService authService)
+    {
+        Console.WriteLine("\n=== OAuth2 Authentication URLs ===");
+        
+        var redirectUri = "https://localhost:7000/api/auth/callback";
+        var authUrl = authService.GetAuthorizationUrl("efactura", "sample-state-123");
+        
+        Console.WriteLine("For web applications, use these URLs:");
+        Console.WriteLine($"1. Authorization URL: {authUrl}");
+        Console.WriteLine($"2. Redirect URI: {redirectUri}");
+        Console.WriteLine();
+        Console.WriteLine("Authentication Flow:");
+        Console.WriteLine("1. Redirect user browser to Authorization URL");
+        Console.WriteLine("2. User selects USB certificate and confirms");
+        Console.WriteLine("3. ANAF redirects to your Redirect URI with code");
+        Console.WriteLine("4. Exchange code for JWT token using ExchangeCodeForTokenAsync()");
+        Console.WriteLine("5. Use token for subsequent API calls");
+        Console.WriteLine();
+        Console.WriteLine("See ExampleControllers for complete implementation.");
+    }
+
+    private static void CreateSampleInvoiceOffline()
+    {
+        Console.WriteLine("\n=== Creating Sample Invoice (Offline) ===");
+
+        var invoice = CreateSampleInvoice();
+        
+        Console.WriteLine($"✅ Created invoice: {invoice.Id}");
+        Console.WriteLine($"Issue date: {invoice.IssueDate:yyyy-MM-dd}");
+        Console.WriteLine($"Due date: {invoice.DueDate:yyyy-MM-dd}");
+        Console.WriteLine($"Currency: {invoice.DocumentCurrencyCode}");
+        Console.WriteLine($"Supplier: {invoice.AccountingSupplierParty?.PartyLegalEntity?.RegistrationName}");
+        Console.WriteLine($"Customer: {invoice.AccountingCustomerParty?.PartyLegalEntity?.RegistrationName}");
+        Console.WriteLine($"Lines: {invoice.InvoiceLines?.Count ?? 0}");
+        Console.WriteLine($"Total (excl VAT): {invoice.LegalMonetaryTotal?.TaxExclusiveAmount?.Value} {invoice.LegalMonetaryTotal?.TaxExclusiveAmount?.CurrencyId}");
+        Console.WriteLine($"VAT Amount: {invoice.TaxTotals?.FirstOrDefault()?.TaxAmount?.Value} {invoice.TaxTotals?.FirstOrDefault()?.TaxAmount?.CurrencyId}");
+        Console.WriteLine($"Total (incl VAT): {invoice.LegalMonetaryTotal?.TaxInclusiveAmount?.Value} {invoice.LegalMonetaryTotal?.TaxInclusiveAmount?.CurrencyId}");
+        
+        Console.WriteLine("\nThis invoice object can be:");
+        Console.WriteLine("- Validated using ValidateInvoiceAsync()");
+        Console.WriteLine("- Uploaded using UploadInvoiceAsync()");
+        Console.WriteLine("- Converted to XML for inspection");
+        Console.WriteLine("- Used as a template for real invoices");
+    }
+
     private static UblInvoice CreateSampleInvoice()
     {
         var invoice = new UblInvoice
@@ -295,9 +323,6 @@ class Program
             DocumentCurrencyCode = "RON"
         };
 
-        // Add notes
-        invoice.Notes.Add("This is a sample invoice for testing purposes");
-
         // Supplier
         invoice.AccountingSupplierParty = new Party
         {
@@ -306,7 +331,7 @@ class Program
             {
                 StreetName = "Strada Demo nr. 1",
                 CityName = "Bucuresti",
-                CountrySubentity = "RO-B",
+                PostalZone = "010101",
                 Country = new Country { IdentificationCode = "RO" }
             },
             PartyTaxSchemes = new List<PartyTaxScheme>
@@ -333,7 +358,7 @@ class Program
             {
                 StreetName = "Strada Client nr. 2",
                 CityName = "Cluj-Napoca",
-                CountrySubentity = "RO-CJ",
+                PostalZone = "400001",
                 Country = new Country { IdentificationCode = "RO" }
             },
             PartyTaxSchemes = new List<PartyTaxScheme>
@@ -347,17 +372,6 @@ class Program
             }
         };
 
-        // Payment means
-        invoice.PaymentMeans.Add(new PaymentMeans
-        {
-            PaymentMeansCode = "31", // Credit transfer
-            PayeeFinancialAccount = new FinancialAccount
-            {
-                Id = "RO49AAAA1B31007593840000", // Sample IBAN
-                Name = "Demo Supplier SRL"
-            }
-        });
-
         // Invoice lines
         var line1 = new InvoiceLine
         {
@@ -367,8 +381,6 @@ class Program
             Item = new Item
             {
                 Name = "Demo Product 1",
-                Description = "Sample product for testing",
-                SellersItemIdentification = new ItemIdentification { Id = "DEMO-001" },
                 ClassifiedTaxCategories = new List<TaxCategory>
                 {
                     new() { Id = "S", Percent = 19, TaxScheme = new TaxScheme { Id = "VAT" } }
@@ -376,12 +388,11 @@ class Program
             },
             Price = new Price
             {
-                PriceAmount = new Amount { Value = 100.00m, CurrencyId = "RON" },
-                BaseQuantity = new Quantity { Value = 1, UnitCode = "EA" }
+                PriceAmount = new Amount { Value = 100.00m, CurrencyId = "RON" }
             }
         };
 
-        invoice.InvoiceLines.Add(line1);
+        invoice.InvoiceLines = new List<InvoiceLine> { line1 };
 
         // Tax totals
         var taxSubtotal = new TaxSubtotal
@@ -396,11 +407,14 @@ class Program
             }
         };
 
-        invoice.TaxTotals.Add(new TaxTotal
+        invoice.TaxTotals = new List<TaxTotal>
         {
-            TaxAmount = new Amount { Value = 38.00m, CurrencyId = "RON" },
-            TaxSubtotals = new List<TaxSubtotal> { taxSubtotal }
-        });
+            new()
+            {
+                TaxAmount = new Amount { Value = 38.00m, CurrencyId = "RON" },
+                TaxSubtotals = new List<TaxSubtotal> { taxSubtotal }
+            }
+        };
 
         // Monetary totals
         invoice.LegalMonetaryTotal = new MonetaryTotal

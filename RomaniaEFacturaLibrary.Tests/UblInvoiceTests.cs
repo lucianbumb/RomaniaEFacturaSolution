@@ -2,24 +2,23 @@ using RomaniaEFacturaLibrary.Models.Ubl;
 
 namespace RomaniaEFacturaLibrary.Tests;
 
-[TestFixture]
 public class UblInvoiceTests
 {
-    [Test]
+    [Fact]
     public void UblInvoice_DefaultConstructor_InitializesNamespaces()
     {
         // Act
         var invoice = new UblInvoice();
 
         // Assert
-        Assert.That(invoice.Namespaces, Is.Not.Null);
-        Assert.That(invoice.UblVersionId, Is.EqualTo("2.1"));
-        Assert.That(invoice.CustomizationId, Does.Contain("urn:efactura.mfinante.ro:CIUS-RO:1.0.1"));
-        Assert.That(invoice.DocumentCurrencyCode, Is.EqualTo("RON"));
-        Assert.That(invoice.InvoiceTypeCode, Is.EqualTo("380"));
+        Assert.NotNull(invoice.Namespaces);
+        Assert.Equal("2.1", invoice.UblVersionId);
+        Assert.Contains("urn:efactura.mfinante.ro:CIUS-RO:1.0.1", invoice.CustomizationId);
+        Assert.Equal("RON", invoice.DocumentCurrencyCode);
+        Assert.Equal("380", invoice.InvoiceTypeCode);
     }
 
-    [Test]
+    [Fact]
     public void UblInvoice_SetProperties_PropertiesAreSet()
     {
         // Arrange
@@ -32,11 +31,11 @@ public class UblInvoiceTests
         invoice.IssueDate = testDate;
 
         // Assert
-        Assert.That(invoice.Id, Is.EqualTo(testId));
-        Assert.That(invoice.IssueDate, Is.EqualTo(testDate));
+        Assert.Equal(testId, invoice.Id);
+        Assert.Equal(testDate, invoice.IssueDate);
     }
 
-    [Test]
+    [Fact]
     public void Amount_SetValue_ValueIsSet()
     {
         // Arrange
@@ -49,11 +48,11 @@ public class UblInvoiceTests
         amount.CurrencyId = testCurrency;
 
         // Assert
-        Assert.That(amount.Value, Is.EqualTo(testValue));
-        Assert.That(amount.CurrencyId, Is.EqualTo(testCurrency));
+        Assert.Equal(testValue, amount.Value);
+        Assert.Equal(testCurrency, amount.CurrencyId);
     }
 
-    [Test]
+    [Fact]
     public void Quantity_SetValue_ValueIsSet()
     {
         // Arrange
@@ -66,11 +65,11 @@ public class UblInvoiceTests
         quantity.UnitCode = testUnit;
 
         // Assert
-        Assert.That(quantity.Value, Is.EqualTo(testValue));
-        Assert.That(quantity.UnitCode, Is.EqualTo(testUnit));
+        Assert.Equal(testValue, quantity.Value);
+        Assert.Equal(testUnit, quantity.UnitCode);
     }
 
-    [Test]
+    [Fact]
     public void Party_SetProperties_PropertiesAreSet()
     {
         // Arrange
@@ -87,13 +86,13 @@ public class UblInvoiceTests
         party.PartyLegalEntity = legalEntity;
 
         // Assert
-        Assert.That(party.PartyName, Is.EqualTo(partyName));
-        Assert.That(party.PartyLegalEntity, Is.EqualTo(legalEntity));
-        Assert.That(party.PartyName.Name, Is.EqualTo("Test Company"));
-        Assert.That(party.PartyLegalEntity.RegistrationName, Is.EqualTo("Test Company SRL"));
+        Assert.Equal(partyName, party.PartyName);
+        Assert.Equal(legalEntity, party.PartyLegalEntity);
+        Assert.Equal("Test Company", party.PartyName.Name);
+        Assert.Equal("Test Company SRL", party.PartyLegalEntity.RegistrationName);
     }
 
-    [Test]
+    [Fact]
     public void InvoiceLine_SetProperties_PropertiesAreSet()
     {
         // Arrange
@@ -109,49 +108,49 @@ public class UblInvoiceTests
         line.Item = item;
 
         // Assert
-        Assert.That(line.Id, Is.EqualTo("1"));
-        Assert.That(line.InvoicedQuantity, Is.EqualTo(quantity));
-        Assert.That(line.LineExtensionAmount, Is.EqualTo(amount));
-        Assert.That(line.Item, Is.EqualTo(item));
+        Assert.Equal("1", line.Id);
+        Assert.Equal(quantity, line.InvoicedQuantity);
+        Assert.Equal(amount, line.LineExtensionAmount);
+        Assert.Equal(item, line.Item);
     }
 
-    [Test]
+    [Fact]
     public void TaxCategory_DefaultValues_AreCorrect()
     {
         // Act
         var taxCategory = new TaxCategory();
 
         // Assert
-        Assert.That(taxCategory.Id, Is.EqualTo("S")); // Standard rate
+        Assert.Equal("S", taxCategory.Id); // Standard rate
     }
 
-    [Test]
+    [Fact]
     public void TaxScheme_DefaultValues_AreCorrect()
     {
         // Act
         var taxScheme = new TaxScheme();
 
         // Assert
-        Assert.That(taxScheme.Id, Is.EqualTo("VAT"));
+        Assert.Equal("VAT", taxScheme.Id);
     }
 
-    [Test]
+    [Fact]
     public void Country_DefaultValues_AreCorrect()
     {
         // Act
         var country = new Country();
 
         // Assert
-        Assert.That(country.IdentificationCode, Is.EqualTo("RO"));
+        Assert.Equal("RO", country.IdentificationCode);
     }
 
-    [Test]
+    [Fact]
     public void PaymentMeans_DefaultValues_AreCorrect()
     {
         // Act
         var paymentMeans = new PaymentMeans();
 
         // Assert
-        Assert.That(paymentMeans.PaymentMeansCode, Is.EqualTo("31")); // Credit transfer
+        Assert.Equal("31", paymentMeans.PaymentMeansCode); // Credit transfer
     }
 }

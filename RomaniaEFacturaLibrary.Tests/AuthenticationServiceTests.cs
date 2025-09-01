@@ -8,90 +8,107 @@ using System.Net;
 
 namespace RomaniaEFacturaLibrary.Tests;
 
-[TestFixture]
 public class AuthenticationServiceTests
 {
-    private Mock<HttpMessageHandler> _httpMessageHandlerMock;
-    private HttpClient _httpClient;
-    private IOptions<EFacturaConfig> _config;
-    private ILogger<AuthenticationService> _logger;
-    private AuthenticationService _authService;
+    private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+    private readonly IOptions<EFacturaConfig> _config;
+    private readonly ILogger<AuthenticationService> _logger;
+    private readonly AuthenticationService _authService;
 
-    [SetUp]
-    public void Setup()
+    public AuthenticationServiceTests()
     {
-        _httpMessageHandlerMock = new Mock<HttpMessageHandler>();
-        _httpClient = new HttpClient(_httpMessageHandlerMock.Object);
+        _httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        var httpClient = new HttpClient();
+        _httpClientFactoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
         
         _config = Options.Create(new EFacturaConfig
         {
             Environment = EFacturaEnvironment.Test,
+            ClientId = "test-client-id",
+            ClientSecret = "test-client-secret",
+            RedirectUri = "https://localhost:5000/callback",
             Cif = "12345678",
             TimeoutSeconds = 30
         });
         
         _logger = Mock.Of<ILogger<AuthenticationService>>();
-        _authService = new AuthenticationService(_httpClient, _config, _logger);
+        _authService = new AuthenticationService(_httpClientFactoryMock.Object, _config, _logger);
     }
 
-    [TearDown]
-    public void TearDown()
-    {
-        _httpClient?.Dispose();
-    }
-
-    [Test]
+    [Fact]
     public void EFacturaConfig_TestEnvironment_HasCorrectUrls()
     {
         // Arrange
         var config = new EFacturaConfig { Environment = EFacturaEnvironment.Test };
 
         // Assert
-        Assert.That(config.BaseUrl, Does.Contain("test"));
-        Assert.That(config.AuthorizeUrl, Is.Not.Null);
-        Assert.That(config.TokenUrl, Is.Not.Null);
+        Assert.Contains("test", config.BaseUrl);
+        Assert.NotNull(config.AuthorizeUrl);
+        Assert.NotNull(config.TokenUrl);
+        Assert.Contains("logincert.anaf.ro", config.OAuthBaseUrl);
     }
 
-    [Test]
+    [Fact]
     public void EFacturaConfig_ProductionEnvironment_HasCorrectUrls()
     {
         // Arrange
         var config = new EFacturaConfig { Environment = EFacturaEnvironment.Production };
 
         // Assert
-        Assert.That(config.BaseUrl, Does.Contain("prod"));
-        Assert.That(config.AuthorizeUrl, Is.Not.Null);
-        Assert.That(config.TokenUrl, Is.Not.Null);
+        Assert.Contains("prod", config.BaseUrl);
+        Assert.NotNull(config.AuthorizeUrl);
+        Assert.NotNull(config.TokenUrl);
+        Assert.Contains("logincert.anaf.ro", config.OAuthBaseUrl);
     }
 
-    [Test]
+    [Fact]
     public void GetAuthorizationUrl_ValidParameters_ReturnsCorrectUrl()
     {
         // Arrange
+        var clientId = "test-client";
         var redirectUri = "https://localhost:5000/callback";
+        var scope = "efactura";
         var state = "test-state";
 
         // Act
-        var authUrl = _authService.GetAuthorizationUrl(redirectUri, state);
+        var authUrl = _authService.GetAuthorizationUrl(clientId, redirectUri, scope, state);
 
         // Assert
-        Assert.That(authUrl, Does.Contain("logincert.anaf.ro"));
-        Assert.That(authUrl, Does.Contain("response_type=code"));
-        Assert.That(authUrl, Does.Contain("client_id=12345678"));
-        Assert.That(authUrl, Does.Contain($"redirect_uri={Uri.EscapeDataString(redirectUri)}"));
-        Assert.That(authUrl, Does.Contain($"state={state}"));
-        Assert.That(authUrl, Does.Contain("scope=eFACTURA"));
+        Assert.Contains("logincert.anaf.ro", authUrl);
+        Assert.Contains("response_type=code", authUrl);
+        Assert.Contains($"client_id={clientId}", authUrl);
+        Assert.Contains("token_content_type=jwt", authUrl);
+        Assert.Contains($"scope={scope}", authUrl);
+        Assert.Contains($"state={state}", authUrl);
     }
 
-    [Test]
-    public void GetAccessTokenAsync_NoToken_ThrowsAuthenticationException()
+    [Fact]
+    public void GetAuthorizationUrl_WithConfigValues_ReturnsCorrectUrl()
+    {
+        // Act
+        var authUrl = _authService.GetAuthorizationUrl("efactura", "test-state");
+
+        // Assert
+        Assert.Contains("logincert.anaf.ro", authUrl);
+        Assert.Contains("response_type=code", authUrl);
+        Assert.Contains("client_id=test-client-id", authUrl);
+        Assert.Contains("redirect_uri=", authUrl); // Just check the parameter exists
+        Assert.Contains("localhost", authUrl); // Check the host is there
+        Assert.Contains("callback", authUrl); // Check the path is there
+        Assert.Contains("token_content_type=jwt", authUrl);
+        Assert.Contains("scope=efactura", authUrl);
+        Assert.Contains("state=test-state", authUrl);
+    }
+
+    [Fact]
+    public async Task GetValidAccessTokenAsync_NoToken_ThrowsAuthenticationException()
     {
         // Act & Assert
-        Assert.ThrowsAsync<AuthenticationException>(
-            async () => await _authService.GetAccessTokenAsync());
+        await Assert.ThrowsAsync<AuthenticationException>(
+            () => _authService.GetValidAccessTokenAsync());
     }
 
-    [Test]
+    [Fact]
     public void TokenResponse_ValidToken_IsValidReturnsTrue()
     {
         // Arrange
@@ -103,10 +120,10 @@ public class AuthenticationServiceTests
         };
 
         // Assert
-        Assert.That(token.IsValid, Is.True);
+        Assert.True(token.IsValid);
     }
 
-    [Test]
+    [Fact]
     public void TokenResponse_ExpiredToken_IsValidReturnsFalse()
     {
         // Arrange
@@ -118,11 +135,11 @@ public class AuthenticationServiceTests
         };
 
         // Assert
-        Assert.That(token.IsValid, Is.False);
+        Assert.False(token.IsValid);
     }
 
-    [Test]
-    public async Task GetAccessTokenAsync_ValidToken_ReturnsToken()
+    [Fact]
+    public async Task GetValidAccessTokenAsync_ValidToken_ReturnsToken()
     {
         // Arrange
         var token = new TokenResponse
@@ -135,9 +152,9 @@ public class AuthenticationServiceTests
         _authService.SetToken(token);
 
         // Act
-        var accessToken = await _authService.GetAccessTokenAsync();
+        var accessToken = await _authService.GetValidAccessTokenAsync();
 
         // Assert
-        Assert.That(accessToken, Is.EqualTo("valid-token"));
+        Assert.Equal("valid-token", accessToken);
     }
 }

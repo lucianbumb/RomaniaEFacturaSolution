@@ -7,20 +7,18 @@ using Moq;
 
 namespace RomaniaEFacturaLibrary.Tests;
 
-[TestFixture]
 public class XmlServiceTests
 {
-    private IXmlService _xmlService;
-    private ILogger<XmlService> _logger;
+    private readonly IXmlService _xmlService;
+    private readonly ILogger<XmlService> _logger;
 
-    [SetUp]
-    public void Setup()
+    public XmlServiceTests()
     {
         _logger = Mock.Of<ILogger<XmlService>>();
         _xmlService = new XmlService(_logger);
     }
 
-    [Test]
+    [Fact]
     public async Task SerializeInvoiceAsync_ValidInvoice_ReturnsValidXml()
     {
         // Arrange
@@ -30,14 +28,14 @@ public class XmlServiceTests
         var xml = await _xmlService.SerializeInvoiceAsync(invoice);
 
         // Assert
-        Assert.That(xml, Is.Not.Null);
-        Assert.That(xml, Does.Contain("<?xml"));
-        Assert.That(xml, Does.Contain("<Invoice"));
-        Assert.That(xml, Does.Contain(invoice.Id));
-        Assert.That(xml, Does.Contain("urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"));
+        Assert.NotNull(xml);
+        Assert.Contains("<?xml", xml);
+        Assert.Contains("<Invoice", xml);
+        Assert.Contains(invoice.Id, xml);
+        Assert.Contains("urn:oasis:names:specification:ubl:schema:xsd:Invoice-2", xml);
     }
 
-    [Test]
+    [Fact]
     public async Task DeserializeInvoiceAsync_ValidXml_ReturnsInvoice()
     {
         // Arrange
@@ -48,13 +46,13 @@ public class XmlServiceTests
         var deserializedInvoice = await _xmlService.DeserializeInvoiceAsync(xml);
 
         // Assert
-        Assert.That(deserializedInvoice, Is.Not.Null);
-        Assert.That(deserializedInvoice.Id, Is.EqualTo(originalInvoice.Id));
-        Assert.That(deserializedInvoice.IssueDate, Is.EqualTo(originalInvoice.IssueDate));
-        Assert.That(deserializedInvoice.DocumentCurrencyCode, Is.EqualTo(originalInvoice.DocumentCurrencyCode));
+        Assert.NotNull(deserializedInvoice);
+        Assert.Equal(originalInvoice.Id, deserializedInvoice.Id);
+        Assert.Equal(originalInvoice.IssueDate, deserializedInvoice.IssueDate);
+        Assert.Equal(originalInvoice.DocumentCurrencyCode, deserializedInvoice.DocumentCurrencyCode);
     }
 
-    [Test]
+    [Fact]
     public async Task ValidateXmlAsync_ValidXml_ReturnsSuccessfulValidation()
     {
         // Arrange
@@ -65,13 +63,13 @@ public class XmlServiceTests
         var validation = await _xmlService.ValidateXmlAsync(xml);
 
         // Assert
-        Assert.That(validation, Is.Not.Null);
-        Assert.That(validation.IsWellFormed, Is.True);
-        Assert.That(validation.IsValid, Is.True);
-        Assert.That(validation.Errors, Is.Empty);
+        Assert.NotNull(validation);
+        Assert.True(validation.IsWellFormed);
+        Assert.True(validation.IsValid);
+        Assert.Empty(validation.Errors);
     }
 
-    [Test]
+    [Fact]
     public async Task ValidateXmlAsync_InvalidXml_ReturnsFailedValidation()
     {
         // Arrange
@@ -81,12 +79,12 @@ public class XmlServiceTests
         var validation = await _xmlService.ValidateXmlAsync(invalidXml);
 
         // Assert
-        Assert.That(validation, Is.Not.Null);
-        Assert.That(validation.IsValid, Is.False);
-        Assert.That(validation.Errors, Is.Not.Empty);
+        Assert.NotNull(validation);
+        Assert.False(validation.IsValid);
+        Assert.NotEmpty(validation.Errors);
     }
 
-    [Test]
+    [Fact]
     public void CleanXml_XmlWithBom_RemovesBom()
     {
         // Arrange
@@ -98,20 +96,19 @@ public class XmlServiceTests
 
         // Assert
         // Check length first to verify BOM was removed
-        Assert.That(cleanedXml.Length, Is.EqualTo(expectedLength), 
-            $"Expected length {expectedLength}, but got {cleanedXml.Length}. Input length: {xmlWithBom.Length}");
+        Assert.Equal(expectedLength, cleanedXml.Length);
         
         // Check that it starts with XML declaration, not BOM
-        Assert.That(cleanedXml, Does.StartWith("<?xml"), "XML should start with declaration");
+        Assert.StartsWith("<?xml", cleanedXml);
         
         // Verify the first character is not BOM
         if (cleanedXml.Length > 0)
         {
-            Assert.That((int)cleanedXml[0], Is.Not.EqualTo(0xFEFF), "First character should not be BOM");
+            Assert.NotEqual(0xFEFF, (int)cleanedXml[0]);
         }
     }
 
-    [Test]
+    [Fact]
     public void FormatXml_UnformattedXml_ReturnsFormattedXml()
     {
         // Arrange
@@ -121,8 +118,8 @@ public class XmlServiceTests
         var formattedXml = _xmlService.FormatXml(unformattedXml);
 
         // Assert
-        Assert.That(formattedXml, Is.Not.Null);
-        Assert.That(formattedXml, Does.Contain("\n") | Does.Contain("\r"));
+        Assert.NotNull(formattedXml);
+        Assert.True(formattedXml.Contains("\n") || formattedXml.Contains("\r"));
     }
 
     private static UblInvoice CreateSampleInvoice()
