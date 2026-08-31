@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RomaniaEFactura</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- NuGet package. Note: no GeneratePackageOnBuild and no PackageOutputPath -
+       v2 packed on every build into a hardcoded D:\ path that broke on any other machine. -->
+  <PropertyGroup>
+    <PackageId>RomaniaEFacturaLibrary</PackageId>
+    <Version>3.0.0-alpha.1</Version>
+    <Authors>lucianbumb</Authors>
+    <Description>
+      Romanian e-Factura (ANAF SPV) integration for .NET web applications. Offline CIUS-RO
+      validation, UBL invoice/credit note/debit note generation, OAuth2 with persistent token
+      storage, and the full send and download lifecycle.
+    </Description>
+    <PackageTags>efactura;romania;anaf;spv;ubl;en16931;cius-ro;invoice;oauth2</PackageTags>
+    <PackageProjectUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
