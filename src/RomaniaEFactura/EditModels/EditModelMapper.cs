@@ -33,6 +33,10 @@ public static class EditModelMapper
             InvoicePeriod = MapPeriod(model),
             OrderReference = MapOrderReference(model),
             BillingReferences = MapPrecedingDocuments(model),
+            DespatchDocumentReference = Reference(model.DespatchAdviceReference),
+            ReceiptDocumentReference = Reference(model.ReceivingAdviceReference),
+            OriginatorDocumentReference = Reference(model.TenderOrLotReference),
+            ContractDocumentReference = Reference(model.ContractReference),
             AccountingSupplierParty = new PartyWrapper(MapParty(model.Seller)),
             AccountingCustomerParty = new PartyWrapper(MapParty(model.Buyer)),
             TaxRepresentativeParty = MapTaxRepresentative(model),
@@ -83,6 +87,10 @@ public static class EditModelMapper
             InvoicePeriod = MapPeriod(model),
             OrderReference = MapOrderReference(model),
             BillingReferences = MapPrecedingDocuments(model),
+            DespatchDocumentReference = Reference(model.DespatchAdviceReference),
+            ReceiptDocumentReference = Reference(model.ReceivingAdviceReference),
+            OriginatorDocumentReference = Reference(model.TenderOrLotReference),
+            ContractDocumentReference = Reference(model.ContractReference),
             AccountingSupplierParty = new PartyWrapper(MapParty(model.Seller)),
             AccountingCustomerParty = new PartyWrapper(MapParty(model.Buyer)),
             TaxRepresentativeParty = MapTaxRepresentative(model),
@@ -321,6 +329,9 @@ public static class EditModelMapper
         CountrySubentity = address.IsRomanian
             ? NullIfBlank(address.County)
             : NullIfBlank(address.Region),
+        AddressLine = NullIfBlank(address.AddressLine3) is { } line
+            ? new AddressLine { Line = line }
+            : null,
         Country = new Country { IdentificationCode = address.CountryCode.ToUpperInvariant() },
     };
 
@@ -335,10 +346,31 @@ public static class EditModelMapper
                 EndDate = model.PeriodEnd?.ToDateTime(TimeOnly.MinValue),
             };
 
-    private static OrderReference? MapOrderReference(DocumentEditModel model) =>
-        NullIfBlank(model.OrderReference) is { } order
-            ? new OrderReference { Id = order }
-            : null;
+    /// <summary>
+    /// The order reference, which carries both the buyer's number and the seller's.
+    /// </summary>
+    /// <remarks>
+    /// UBL puts BT-13 and BT-14 in one element, so a document stating only a sales order still
+    /// needs an <c>OrderReference</c> — with an empty <c>cbc:ID</c>, which is what the schema
+    /// requires and what ANAF's validator accepts.
+    /// </remarks>
+    private static OrderReference? MapOrderReference(DocumentEditModel model)
+    {
+        var buyerOrder = NullIfBlank(model.OrderReference);
+        var salesOrder = NullIfBlank(model.SalesOrderReference);
+
+        if (buyerOrder is null && salesOrder is null) return null;
+
+        return new OrderReference
+        {
+            Id = buyerOrder ?? string.Empty,
+            SalesOrderId = salesOrder,
+        };
+    }
+
+    /// <summary>A bare document reference, for the fields that carry only an identifier.</summary>
+    private static DocumentReference? Reference(string? id) =>
+        NullIfBlank(id) is { } value ? new DocumentReference { Id = value } : null;
 
     private static List<BillingReference> MapPrecedingDocuments(DocumentEditModel model) =>
     [

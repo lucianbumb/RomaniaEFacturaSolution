@@ -72,6 +72,15 @@ internal sealed record DocumentView
     /// <summary>How many supporting documents are attached (BG-24).</summary>
     public required int SupportingDocumentCount { get; init; }
 
+    /// <summary>
+    /// The document references that carry only an identifier, paired with the rule that caps each.
+    /// </summary>
+    /// <remarks>
+    /// Kept as a list rather than five properties because nothing reads them individually — the
+    /// only rules they have are length caps.
+    /// </remarks>
+    public required IReadOnlyList<(string Rule, string Term, string? Value)> OtherReferences { get; init; }
+
     /// <summary>Projects an invoice onto the common shape.</summary>
     public static DocumentView From(UblInvoice invoice) => new()
     {
@@ -106,6 +115,15 @@ internal sealed record DocumentView
         Notes = invoice.Notes,
         PrecedingDocumentCount = invoice.BillingReferences.Count,
         SupportingDocumentCount = invoice.AdditionalDocumentReferences.Count,
+        OtherReferences =
+        [
+            ("BR-RO-L0302", "The contract reference (BT-12)", invoice.ContractDocumentReference?.Id.Value),
+            ("BR-RO-L0303", "The purchase order reference (BT-13)", invoice.OrderReference?.Id.Value),
+            ("BR-RO-L0304", "The sales order reference (BT-14)", invoice.OrderReference?.SalesOrderId),
+            ("BR-RO-L0305", "The receiving advice reference (BT-15)", invoice.ReceiptDocumentReference?.Id.Value),
+            ("BR-RO-L0306", "The despatch advice reference (BT-16)", invoice.DespatchDocumentReference?.Id.Value),
+            ("BR-RO-L0307", "The tender or lot reference (BT-17)", invoice.OriginatorDocumentReference?.Id.Value),
+        ],
     };
 
     /// <summary>Projects a credit note onto the common shape.</summary>
@@ -143,6 +161,15 @@ internal sealed record DocumentView
         Notes = creditNote.Notes,
         PrecedingDocumentCount = creditNote.BillingReferences.Count,
         SupportingDocumentCount = creditNote.AdditionalDocumentReferences.Count,
+        OtherReferences =
+        [
+            ("BR-RO-L0302", "The contract reference (BT-12)", creditNote.ContractDocumentReference?.Id.Value),
+            ("BR-RO-L0303", "The purchase order reference (BT-13)", creditNote.OrderReference?.Id.Value),
+            ("BR-RO-L0304", "The sales order reference (BT-14)", creditNote.OrderReference?.SalesOrderId),
+            ("BR-RO-L0305", "The receiving advice reference (BT-15)", creditNote.ReceiptDocumentReference?.Id.Value),
+            ("BR-RO-L0306", "The despatch advice reference (BT-16)", creditNote.DespatchDocumentReference?.Id.Value),
+            ("BR-RO-L0307", "The tender or lot reference (BT-17)", creditNote.OriginatorDocumentReference?.Id.Value),
+        ],
     };
 }
 

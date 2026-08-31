@@ -32,6 +32,10 @@ public partial class CiusRoLengthTableTests
             { "BR-RO-L156", CiusRoLengths.PrecedingDocumentNumber },
             { "BR-RO-L0302", CiusRoLengths.ContractReference },
             { "BR-RO-L0303", CiusRoLengths.OrderReference },
+            { "BR-RO-L0304", CiusRoLengths.ContractReference },
+            { "BR-RO-L0305", CiusRoLengths.ContractReference },
+            { "BR-RO-L0306", CiusRoLengths.ContractReference },
+            { "BR-RO-L0307", CiusRoLengths.ContractReference },
             { "BR-RO-L1001", CiusRoLengths.AccountingReference },
             { "BR-RO-L301", CiusRoLengths.PaymentTerms },
             { "BR-RO-L302", CiusRoLengths.Note },
@@ -106,6 +110,8 @@ public partial class CiusRoLengthTableTests
         (CiusRoLengths.PostalCode, ["BR-RO-L0201", "BR-RO-L0202", "BR-RO-L0203", "BR-RO-L0204"]),
         (CiusRoLengths.AddressLine1, ["BR-RO-L151", "BR-RO-L152", "BR-RO-L153", "BR-RO-L154"]),
         (CiusRoLengths.AddressLine2, ["BR-RO-L1002", "BR-RO-L1007", "BR-RO-L1012", "BR-RO-L1014"]),
+        // Address line 3 shares line 2's cap of 100 across all four roles.
+        (CiusRoLengths.AddressLine2, ["BR-RO-L1003", "BR-RO-L1008", "BR-RO-L1013", "BR-RO-L1015"]),
         (CiusRoLengths.PartyName, ["BR-RO-L201", "BR-RO-L203", "BR-RO-L206"]),
         (CiusRoLengths.TradingName, ["BR-RO-L202", "BR-RO-L204"]),
         (CiusRoLengths.ContactName, ["BR-RO-L1004", "BR-RO-L1009"]),
@@ -140,18 +146,10 @@ public partial class CiusRoLengthTableTests
         // Deliberately not enforced, because the library cannot express the fields they cap.
         var unrepresentable = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BR-RO-L1013"] = "tax representative address line 3 (BT-164) — BG-11 is not modelled",
             ["BR-RO-L207"] = "deliver-to party name (BT-70) — the delivery party name is not modelled",
             ["BR-RO-L209"] = "payment card holder name (BT-88) — card payment is not modelled",
             ["BR-RO-L210"] = "external document location (BT-124) — attachments are not modelled",
             ["BR-RO-L211"] = "attached document filename (BT-125-2) — attachments are not modelled",
-            ["BR-RO-L1003"] = "address line 3 (BT-162) — the third address line is not modelled",
-            ["BR-RO-L1008"] = "address line 3 (BT-163) — the third address line is not modelled",
-            ["BR-RO-L1015"] = "address line 3 (BT-165) — the third address line is not modelled",
-            ["BR-RO-L0304"] = "sales order reference (BT-14) — not modelled",
-            ["BR-RO-L0305"] = "receiving advice reference (BT-15) — not modelled",
-            ["BR-RO-L0306"] = "despatch advice reference (BT-16) — not modelled",
-            ["BR-RO-L0307"] = "tender or lot reference (BT-17) — not modelled",
         };
 
         var unexplained = limits.Keys

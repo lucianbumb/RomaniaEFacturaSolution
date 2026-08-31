@@ -38,6 +38,9 @@ public class EditModelOracleTests
         "tax-representative-in-bucharest",
         // BG-32: structured attributes on a line, which the buyer's system can act on.
         "item-attributes",
+        // Every optional reference at once, and a third address line: each sits at a specific
+        // position in the UBL sequence, and a wrong one is schema-invalid.
+        "every-document-reference",
     ];
 
     [RequiresAnafValidatorTheory]
@@ -193,6 +196,20 @@ public class EditModelOracleTests
                 var invoice = SampleEditModels.MinimalInvoice();
                 invoice.Lines[0].Quantity = 7m;
                 invoice.Lines[0].UnitPrice = 12.3456m;
+                return invoice;
+            }
+
+            case "every-document-reference":
+            {
+                var invoice = SampleEditModels.MinimalInvoice();
+                invoice.OrderReference = "PO-2026-1";
+                invoice.SalesOrderReference = "SO-2026-1";
+                invoice.ContractReference = "CTR-2026-1";
+                invoice.ReceivingAdviceReference = "RCV-2026-1";
+                invoice.DespatchAdviceReference = "DSP-2026-1";
+                invoice.TenderOrLotReference = "TND-2026-1";
+                invoice.Seller.Address.AddressLine3 = "Etaj 3, birou 12";
+                invoice.Buyer.Address.AddressLine3 = "Corp B";
                 return invoice;
             }
 

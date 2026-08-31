@@ -135,9 +135,27 @@ public sealed class PostalAddress
     [XmlElement("CountrySubentity", Namespace = UblNamespaces.Cbc)]
     public string? CountrySubentity { get; set; }
 
+    /// <summary>
+    /// A third address line (BT-162 / BT-163 / BT-165).
+    /// </summary>
+    /// <remarks>
+    /// UBL puts lines one and two in their own elements and the third in a nested
+    /// <c>cac:AddressLine</c>, which is why this looks unlike its two siblings.
+    /// </remarks>
+    [XmlElement("AddressLine", Namespace = UblNamespaces.Cac)]
+    public AddressLine? AddressLine { get; set; }
+
     /// <summary>Country (BT-40 / BT-55).</summary>
     [XmlElement("Country", Namespace = UblNamespaces.Cac)]
     public Country? Country { get; set; }
+}
+
+/// <summary>The third line of an address, which UBL nests rather than naming directly.</summary>
+public sealed class AddressLine
+{
+    /// <summary>The line itself.</summary>
+    [XmlElement("Line", Namespace = UblNamespaces.Cbc)]
+    public string Line { get; set; } = string.Empty;
 }
 
 /// <summary>A country reference.</summary>

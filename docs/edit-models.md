@@ -135,6 +135,22 @@ line.ItemAttributes =
 Both halves are required (BR-54), the name is capped at 50 characters and the value at 100 — an
 asymmetry that is easy to get backwards — and a line may carry at most 50.
 
+## Referring to other documents
+
+Six references, each landing in a different UBL element:
+
+| Model property | Term |
+|---|---|
+| `OrderReference` | the buyer's purchase order (BT-13) |
+| `SalesOrderReference` | the seller's own order (BT-14) |
+| `ContractReference` | the contract the invoice is issued under (BT-12) |
+| `ReceivingAdviceReference` | where the buyer confirmed the goods (BT-15) |
+| `DespatchAdviceReference` | where the seller announced the shipment (BT-16) |
+| `TenderOrLotReference` | a public procurement award (BT-17) |
+
+BT-13 and BT-14 share one element, so stating only a sales order still emits an `OrderReference`
+with an empty identifier — which is what the schema requires.
+
 ## Selling into Romania from abroad
 
 A seller not established in Romania appoints a fiscal representative, and the invoice must name

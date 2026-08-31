@@ -41,16 +41,21 @@ internal static class CiusRoLengthRules
 
         foreach (var entry in ForParty(doc.Seller, "Seller", "BR-RO-L201", "BR-RO-L202",
                      "BR-RO-L151", "BR-RO-L1002", "BR-RO-L0501", "BR-RO-L0201",
-                     "BR-RO-L1004", "BR-RO-L1005", "BR-RO-L1006"))
+                     "BR-RO-L1004", "BR-RO-L1005", "BR-RO-L1006", "BR-RO-L1003"))
         {
             yield return entry;
         }
 
         foreach (var entry in ForParty(doc.Buyer, "Buyer", "BR-RO-L203", "BR-RO-L204",
                      "BR-RO-L152", "BR-RO-L1007", "BR-RO-L0502", "BR-RO-L0202",
-                     "BR-RO-L1009", "BR-RO-L1010", "BR-RO-L1011"))
+                     "BR-RO-L1009", "BR-RO-L1010", "BR-RO-L1011", "BR-RO-L1008"))
         {
             yield return entry;
+        }
+
+        foreach (var (rule, term, value) in doc.OtherReferences)
+        {
+            yield return (rule, CiusRoLengths.ContractReference, value, term, "References");
         }
 
         yield return ("BR-RO-L1000", CiusRoLengths.CompanyLegalForm,
@@ -80,6 +85,8 @@ internal static class CiusRoLengthRules
                 "The tax representative's city (BT-66)", "TaxRepresentative.PostalAddress.CityName");
             yield return ("BR-RO-L0203", CiusRoLengths.PostalCode, address?.PostalZone,
                 "The tax representative's post code (BT-67)", "TaxRepresentative.PostalAddress.PostalZone");
+            yield return ("BR-RO-L1013", CiusRoLengths.AddressLine2, address?.AddressLine?.Line,
+                "The tax representative's address line 3 (BT-164)", "TaxRepresentative.PostalAddress.AddressLine");
         }
 
         // The delivery address, which the seller and buyer loop above does not reach.
@@ -94,6 +101,8 @@ internal static class CiusRoLengthRules
                 "The delivery city (BT-77)", "Delivery.Address.CityName");
             yield return ("BR-RO-L0204", CiusRoLengths.PostalCode, delivery.PostalZone,
                 "The delivery post code (BT-78)", "Delivery.Address.PostalZone");
+            yield return ("BR-RO-L1015", CiusRoLengths.AddressLine2, delivery.AddressLine?.Line,
+                "The delivery address line 3 (BT-165)", "Delivery.Address.AddressLine");
         }
 
         foreach (var (adjustment, index) in doc.AllowanceCharges.Select((a, i) => (a, i)))
@@ -151,7 +160,8 @@ internal static class CiusRoLengthRules
         string postalCodeRule,
         string contactNameRule,
         string telephoneRule,
-        string emailRule)
+        string emailRule,
+        string addressLine3Rule)
     {
         var noun = role.ToLowerInvariant();
         var address = party.PostalAddress;
@@ -174,6 +184,8 @@ internal static class CiusRoLengthRules
             $"The {noun}'s telephone", $"{role}.Contact.Telephone");
         yield return (emailRule, CiusRoLengths.ContactEmail, party.Contact?.ElectronicMail,
             $"The {noun}'s email", $"{role}.Contact.ElectronicMail");
+        yield return (addressLine3Rule, CiusRoLengths.AddressLine2, address?.AddressLine?.Line,
+            $"The {noun}'s address line 3", $"{role}.PostalAddress.AddressLine");
     }
 
     private static void CheckOccurrences(DocumentView doc, List<ValidationFinding> findings)

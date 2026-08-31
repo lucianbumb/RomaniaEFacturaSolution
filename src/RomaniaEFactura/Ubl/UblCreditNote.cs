@@ -83,6 +83,22 @@ public sealed class UblCreditNote
     [XmlElement("BillingReference", Namespace = UblNamespaces.Cac)]
     public List<BillingReference> BillingReferences { get; set; } = [];
 
+    /// <summary>Despatch advice reference (BT-16).</summary>
+    [XmlElement("DespatchDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? DespatchDocumentReference { get; set; }
+
+    /// <summary>Receiving advice reference (BT-15).</summary>
+    [XmlElement("ReceiptDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? ReceiptDocumentReference { get; set; }
+
+    /// <summary>Tender or lot reference (BT-17).</summary>
+    [XmlElement("OriginatorDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? OriginatorDocumentReference { get; set; }
+
+    /// <summary>Contract reference (BT-12).</summary>
+    [XmlElement("ContractDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? ContractDocumentReference { get; set; }
+
     /// <summary>Supporting documents (BG-24).</summary>
     [XmlElement("AdditionalDocumentReference", Namespace = UblNamespaces.Cac)]
     public List<DocumentReference> AdditionalDocumentReferences { get; set; } = [];

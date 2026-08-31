@@ -87,6 +87,22 @@ public sealed class UblInvoice
     [XmlElement("BillingReference", Namespace = UblNamespaces.Cac)]
     public List<BillingReference> BillingReferences { get; set; } = [];
 
+    /// <summary>Despatch advice reference (BT-16).</summary>
+    [XmlElement("DespatchDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? DespatchDocumentReference { get; set; }
+
+    /// <summary>Receiving advice reference (BT-15).</summary>
+    [XmlElement("ReceiptDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? ReceiptDocumentReference { get; set; }
+
+    /// <summary>Tender or lot reference (BT-17).</summary>
+    [XmlElement("OriginatorDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? OriginatorDocumentReference { get; set; }
+
+    /// <summary>Contract reference (BT-12).</summary>
+    [XmlElement("ContractDocumentReference", Namespace = UblNamespaces.Cac)]
+    public DocumentReference? ContractDocumentReference { get; set; }
+
     /// <summary>Supporting documents and attachments (BG-24).</summary>
     [XmlElement("AdditionalDocumentReference", Namespace = UblNamespaces.Cac)]
     public List<DocumentReference> AdditionalDocumentReferences { get; set; } = [];
@@ -180,12 +196,22 @@ public sealed class InvoiceLine
     public Price Price { get; set; } = new();
 }
 
-/// <summary>A reference to a purchase order (BT-13).</summary>
+/// <summary>A reference to a purchase order (BT-13) and the seller's own order (BT-14).</summary>
 public sealed class OrderReference
 {
-    /// <summary>The order number.</summary>
+    /// <summary>The buyer's order number (BT-13).</summary>
     [XmlElement("ID", Namespace = UblNamespaces.Cbc)]
     public Identifier Id { get; set; } = new();
+
+    /// <summary>
+    /// The seller's own order number (BT-14).
+    /// </summary>
+    /// <remarks>
+    /// Shares an element with BT-13 rather than having one of its own, which is why a document
+    /// carrying only a sales order still needs an <c>OrderReference</c>.
+    /// </remarks>
+    [XmlElement("SalesOrderID", Namespace = UblNamespaces.Cbc)]
+    public string? SalesOrderId { get; set; }
 }
 
 /// <summary>A reference to a preceding invoice (BG-3).</summary>

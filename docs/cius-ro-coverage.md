@@ -29,6 +29,8 @@ Two tests keep this document from drifting:
 | `BR-RO-210` | A delivery address states a subdivision **whatever** its country |
 | `BR-RO-140` / `150` / `160` / `170` | The tax representative's address (BG-11) is complete and correctly coded |
 | `BR-54`, `BR-RO-A052`, `L0505`, `L1025` | Item attributes (BG-32) carry both halves, and stay inside their caps |
+| `BR-RO-L1003`, `L1008`, `L1013`, `L1015` | A third address line, for each of the four roles that can have one |
+| `BR-RO-L0302`…`L0307` | Contract, order, sales order, receiving advice, despatch advice and tender references |
 
 ### Amounts and VAT
 
@@ -57,12 +59,9 @@ absence from this library is the reason its rules are not checked — not an ove
 
 | Fields | Rules |
 |---|---|
-| Tax representative address line 3 (BT-164) | `BR-RO-L1013` |
 | Document attachments (BT-124, BT-125) | `BR-RO-L210`, `L211` |
 | Card payment (BT-88) | `BR-RO-L209` |
-| Address line 3 (BT-162/163/165) | `BR-RO-L1003`, `L1008`, `L1015` |
 | Delivery party name (BT-70) | `BR-RO-L207` |
-| Sales order, receiving advice, despatch advice, tender references (BT-14…17) | `BR-RO-L0304`…`L0307` |
 
 ## Enforced by construction
 
