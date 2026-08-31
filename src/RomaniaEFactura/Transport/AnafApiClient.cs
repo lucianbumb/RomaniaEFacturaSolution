@@ -564,17 +564,35 @@ public sealed class AnafApiClient : IAnafApiClient
         && result.Error!.Message.Contains("nu exista mesaje", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Resolves and normalises the company code. ANAF's API rejects the <c>RO</c> prefix, so it is
-    /// stripped on every call.
+    /// Resolves, normalises and checks the company code. ANAF's API rejects the <c>RO</c> prefix,
+    /// so it is stripped on every call.
     /// </summary>
+    /// <remarks>
+    /// Checked here rather than left to ANAF because a malformed CIF otherwise travels all the way
+    /// to Bucharest and comes back as a sentence in Romanian, spending a call from the daily
+    /// allowance to say what the control digit already said. It is also the value that keys the
+    /// per-company pacing gate below, and a value that is not a company is not one worth pacing.
+    /// </remarks>
     private string ResolveCif(string? cif)
     {
-        var resolved = RomanianCif.Normalize(string.IsNullOrWhiteSpace(cif) ? _options.Cif : cif);
+        var supplied = string.IsNullOrWhiteSpace(cif) ? _options.Cif : cif;
+        var resolved = RomanianCif.Normalize(supplied);
 
-        return string.IsNullOrEmpty(resolved)
-            ? throw new InvalidOperationException(
-                "No CIF was supplied and none is configured. Set EFacturaOptions.Cif or pass one per call.")
-            : resolved;
+        if (string.IsNullOrEmpty(resolved))
+        {
+            throw new InvalidOperationException(
+                "No CIF was supplied and none is configured. Set EFacturaOptions.Cif or pass one per call.");
+        }
+
+        if (!RomanianCif.IsValid(resolved))
+        {
+            throw new ArgumentException(
+                $"'{supplied}' is not a valid Romanian fiscal code - the control digit does not match. "
+                + "ANAF would refuse it, at the cost of a call from the daily allowance.",
+                nameof(cif));
+        }
+
+        return resolved;
     }
 
     private Uri BuildUri(string path, Dictionary<string, string?> query)

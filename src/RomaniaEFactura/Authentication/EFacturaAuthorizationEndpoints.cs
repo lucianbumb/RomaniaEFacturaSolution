@@ -102,7 +102,18 @@ public static class EFacturaAuthorizationEndpoints
             string cif,
             string? returnUrl,
             IAnafOAuthClient oauth) =>
-            Results.Redirect(oauth.BuildAuthorizationUrl(cif, returnUrl, UserKey(context)).ToString()));
+        {
+            // The CIF comes from the path, so a mistyped one is a bad request rather than a fault.
+            // Without this it reaches BuildAuthorizationUrl as an argument exception, and the person
+            // who typed it gets a 500.
+            if (!Validation.RomanianCif.IsValid(cif))
+            {
+                return Results.BadRequest(
+                    "That is not a valid Romanian fiscal code - the control digit does not match.");
+            }
+
+            return Results.Redirect(oauth.BuildAuthorizationUrl(cif, returnUrl, UserKey(context)).ToString());
+        });
 
         group.MapGet("/callback", async (
             HttpContext context,

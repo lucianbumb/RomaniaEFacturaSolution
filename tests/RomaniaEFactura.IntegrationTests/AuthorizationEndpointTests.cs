@@ -127,6 +127,19 @@ public class AuthorizationEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task AMalformedCifIsABadRequestRatherThanAFault()
+    {
+        // The CIF comes from the path. Without the check it reaches BuildAuthorizationUrl as an
+        // argument exception, and whoever mistyped it gets a 500.
+        using var host = await CreateHostAsync();
+        using var client = host.GetTestClient();
+
+        var response = await Get(client, "/efactura/connect/12345678", user: "alice");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // ------------------------------------------------- binding the round trip
 
     [Fact]

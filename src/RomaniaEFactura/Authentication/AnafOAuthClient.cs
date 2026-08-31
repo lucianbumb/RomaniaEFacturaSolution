@@ -56,7 +56,9 @@ public sealed class AnafOAuthClient(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cif);
 
-        var normalized = Validation.RomanianCif.Normalize(cif);
+        // Checked here because the callback stores a token under whatever this says. A value that
+        // is not a company would become a row nothing can ever match a call against.
+        var normalized = Normalize(cif);
         var query = new Dictionary<string, string>
         {
             ["response_type"] = "code",
@@ -86,7 +88,7 @@ public sealed class AnafOAuthClient(
         ArgumentException.ThrowIfNullOrWhiteSpace(cif);
 
         return RequestTokenAsync(
-            Validation.RomanianCif.Normalize(cif),
+            Normalize(cif),
             new Dictionary<string, string>
             {
                 ["grant_type"] = "authorization_code",
@@ -123,6 +125,20 @@ public sealed class AnafOAuthClient(
             // ANAF does not always return a new refresh token; keep the existing one if it does not.
             existingRefreshToken: token.RefreshToken,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Strips the country prefix ANAF's API rejects, and refuses anything that is not a company.
+    /// </summary>
+    private static string Normalize(string cif)
+    {
+        var normalized = Validation.RomanianCif.Normalize(cif);
+
+        return Validation.RomanianCif.IsValid(normalized)
+            ? normalized
+            : throw new ArgumentException(
+                $"'{cif}' is not a valid Romanian fiscal code - the control digit does not match.",
+                nameof(cif));
     }
 
     private async Task<AnafResult<EFacturaToken>> RequestTokenAsync(

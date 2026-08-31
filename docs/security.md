@@ -132,6 +132,30 @@ which the interface supports throughout. A value that is present must have a cor
 All failures are reported together, so a misconfigured deployment costs one restart rather than one
 per mistake.
 
+## The CIF is checked before it leaves the machine
+
+`RomanianCif.Normalize` strips whitespace and an `RO` prefix and returns the rest verbatim, so a
+malformed fiscal code used to travel to ANAF and come back as a sentence in Romanian — spending a
+call from the daily allowance to say what the control digit already said. It is now checked at
+three boundaries: the transport, the OAuth client, and the `connect/{cif}` endpoint, which answers
+**400** rather than faulting.
+
+The authorization path is the one that matters. `ExchangeCodeAsync` stores a token under whatever
+the caller named, so an unchecked value became a row no call could ever match against.
+
+### What this is not
+
+The per-company pacing state (`CompanyGates`, `LastCallPerCompany`, `RefreshGates`) is held in
+process-wide dictionaries that never evict, keyed by CIF. That looks like unbounded growth driven
+by caller-controlled input, and it is not: every path to a `GetOrAdd` runs **after** a lookup that
+returns early when the company has no stored authorization. An entry costs a completed ANAF
+authorization — a qualified certificate — so the dictionaries are bounded by the companies the
+deployment actually serves.
+
+That ordering is load-bearing and easy to reverse by accident, so it is measured rather than
+argued: `CompanyGateTests.AnUnauthorizedCompanyLeavesNoTrace` drives fifty unauthorized companies
+and asserts the dictionary is unchanged.
+
 ## What the library already does
 
 - **Tokens are encrypted at rest** with `IDataProtector`, under a versioned purpose string, and a
