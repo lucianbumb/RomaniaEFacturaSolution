@@ -33,6 +33,10 @@ public sealed class MockAnafState
     /// <summary>Daily call cap for <c>descarcare</c>, per download identifier.</summary>
     public int DownloadQuotaPerDay { get; set; } = 10;
 
+    /// <summary>The most recent upload, for a test that needs to see what was sent.</summary>
+    public UploadRecord? LastUpload() =>
+        _uploads.Values.OrderByDescending(u => u.Uploaded).ThenByDescending(u => u.IndexIncarcare, StringComparer.Ordinal).FirstOrDefault();
+
     /// <summary>Records an accepted upload and returns its index.</summary>
     public UploadRecord AddUpload(string cif, string standard, string xml, bool willBeRejected)
     {

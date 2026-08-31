@@ -57,6 +57,9 @@ internal sealed record DocumentView
     /// <summary>Invoicing period (BG-14).</summary>
     public Period? InvoicePeriod { get; init; }
 
+    /// <summary>Delivery details (BG-13), which carry an address of their own.</summary>
+    public Delivery? Delivery { get; init; }
+
     /// <summary>Projects an invoice onto the common shape.</summary>
     public static DocumentView From(UblInvoice invoice) => new()
     {
@@ -85,6 +88,7 @@ internal sealed record DocumentView
         AllowanceCharges = invoice.AllowanceCharges,
         PaymentTerms = invoice.PaymentTerms,
         InvoicePeriod = invoice.InvoicePeriod,
+        Delivery = invoice.Delivery,
     };
 
     /// <summary>Projects a credit note onto the common shape.</summary>
@@ -116,6 +120,7 @@ internal sealed record DocumentView
         AllowanceCharges = creditNote.AllowanceCharges,
         PaymentTerms = creditNote.PaymentTerms,
         InvoicePeriod = creditNote.InvoicePeriod,
+        Delivery = creditNote.Delivery,
     };
 }
 
