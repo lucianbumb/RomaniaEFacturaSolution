@@ -105,6 +105,33 @@ somebody upload an archive for inspection is one feature away.
 var document = EFacturaArchiveReader.Read(bytes, new ArchiveLimits { MaxTotalUncompressedBytes = 8L * 1024 * 1024 });
 ```
 
+## Configuration is checked at startup
+
+`AddRomaniaEFactura` validates its options with `ValidateOnStart`, so a mistake stops the
+application rather than surfacing as an ANAF error later. The rule that earns its keep:
+
+> **A base address override must be https, unless its host is loopback.**
+
+`ApiBaseAddress` and `OAuthBaseAddress` exist so the library can be pointed at the mock server.
+The same knob will just as happily point a production deployment at a plaintext address, and every
+call carries the bearer token — the OAuth address carries the client secret as HTTP Basic as well.
+Loopback is the seam rather than a blanket https requirement, because pointing the library at the
+mock is supported and necessary, and a loopback address has no transit to protect. `RedirectUri` is
+held to the same rule: ANAF returns the authorization code to it.
+
+The rest are ordinary but worth naming, because each otherwise arrives wearing somebody else's
+clothes. An empty `ClientSecret` produces an `Authorization: Basic` header built from
+`client-id:`, and ANAF answers **401** — indistinguishable from an expired authorization, which
+sends whoever is debugging it to the certificate holder rather than to `appsettings.json`. A
+`ReconcileInterval` of zero kills the reconciler on its first tick, inside a background service
+where nothing reports that it stopped.
+
+`Cif` is deliberately **optional**: a deployment serving several companies passes it per call,
+which the interface supports throughout. A value that is present must have a correct control digit.
+
+All failures are reported together, so a misconfigured deployment costs one restart rather than one
+per mistake.
+
 ## What the library already does
 
 - **Tokens are encrypted at rest** with `IDataProtector`, under a versioned purpose string, and a
