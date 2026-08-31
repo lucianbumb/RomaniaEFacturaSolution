@@ -49,6 +49,7 @@ public static class CiusRoValidator
         CheckTotals(doc, findings);
         CheckVatBreakdown(doc, findings);
         CheckPaymentTerms(doc, findings);
+        CheckPeriods(doc, findings);
 
         return new ValidationReport(findings);
     }
@@ -153,6 +154,22 @@ public static class CiusRoValidator
                 findings.Add(new("RO-CIF-INVALID",
                     $"The {role.ToLowerInvariant()} fiscal code '{identifier}' has an incorrect control digit.",
                     Path: role));
+            }
+        }
+
+        // BR-CO-09: a VAT identifier must carry its country prefix, so a Romanian VAT-registered
+        // party is RO12345674 rather than a bare 12345674. This applies to BT-31/BT-48 only; the
+        // legal registration identifier (BT-30/BT-47) is unprefixed.
+        foreach (var scheme in party.PartyTaxSchemes)
+        {
+            var vatId = scheme.CompanyId?.Value;
+            if (string.IsNullOrWhiteSpace(vatId)) continue;
+
+            if (vatId.Length < 2 || !char.IsAsciiLetter(vatId[0]) || !char.IsAsciiLetter(vatId[1]))
+            {
+                findings.Add(new("BR-CO-09",
+                    $"The {role.ToLowerInvariant()} VAT identifier '{vatId}' must start with a country code, for example RO{vatId}.",
+                    Path: $"{role}.PartyTaxScheme"));
             }
         }
     }
@@ -307,6 +324,33 @@ public static class CiusRoValidator
         CheckTwoDecimals(totals.PayableAmount, "BR-DEC-18", "BT-115", findings);
     }
 
+    /// <summary>
+    /// The VAT categories EN16931 defines, and the rule-code family each one uses.
+    /// </summary>
+    /// <remarks>
+    /// The rules follow one shape per category: <c>-08</c> checks the taxable amount against the
+    /// lines, <c>-09</c> checks the VAT amount against the rate, and <c>-10</c> requires an
+    /// exemption reason where no VAT is charged. Encoding that as a table keeps the seven
+    /// categories from becoming seven near-identical blocks. Reverse charge (<c>AE</c>) and exempt
+    /// (<c>E</c>) matter especially in Romania — taxare inversă is routine.
+    /// </remarks>
+    private static readonly Dictionary<string, VatCategoryRules> VatCategories = new(StringComparer.Ordinal)
+    {
+        ["S"] = new("BR-S", RequiresPositiveRate: true, RequiresExemptionReason: false),
+        ["Z"] = new("BR-Z", RequiresPositiveRate: false, RequiresExemptionReason: false),
+        ["E"] = new("BR-E", RequiresPositiveRate: false, RequiresExemptionReason: true),
+        ["AE"] = new("BR-AE", RequiresPositiveRate: false, RequiresExemptionReason: true),
+        ["K"] = new("BR-IC", RequiresPositiveRate: false, RequiresExemptionReason: true),
+        ["G"] = new("BR-G", RequiresPositiveRate: false, RequiresExemptionReason: true),
+        ["O"] = new("BR-O", RequiresPositiveRate: false, RequiresExemptionReason: true, RateMustBeAbsent: true),
+    };
+
+    private sealed record VatCategoryRules(
+        string Family,
+        bool RequiresPositiveRate,
+        bool RequiresExemptionReason,
+        bool RateMustBeAbsent = false);
+
     private static void CheckVatBreakdown(DocumentView doc, List<ValidationFinding> findings)
     {
         // BR-CO-18: there must be a VAT breakdown.
@@ -317,54 +361,139 @@ public static class CiusRoValidator
             return;
         }
 
+        // BR-CO-14: the total VAT (BT-110) is the sum of the category VAT amounts (BT-117).
+        foreach (var taxTotal in doc.TaxTotals.Where(t => MatchesCurrency(t.TaxAmount, doc.CurrencyCode)))
+        {
+            var sum = taxTotal.TaxSubtotals.Sum(s => s.TaxAmount.Value);
+            if (Math.Abs(sum - taxTotal.TaxAmount.Value) > Tolerance)
+            {
+                findings.Add(new("BR-CO-14",
+                    $"The total VAT (BT-110) is {taxTotal.TaxAmount.Value}, but the breakdown entries total {sum}.",
+                    Path: "TaxTotals.TaxAmount"));
+            }
+        }
+
         foreach (var subtotal in subtotals)
         {
-            var category = subtotal.TaxCategory;
+            var code = subtotal.TaxCategory?.Id?.Value;
 
-            if (string.IsNullOrWhiteSpace(category?.Id?.Value))
+            if (string.IsNullOrWhiteSpace(code))
             {
                 findings.Add(new("BR-CO-17", "Each VAT breakdown entry must have a category code (BT-118).", Path: "TaxTotals"));
                 continue;
             }
 
-            // BR-S-09: for standard-rated entries, VAT = taxable amount x rate.
-            if (string.Equals(category.Id.Value, "S", StringComparison.Ordinal))
+            if (!VatCategories.TryGetValue(code, out var rules))
             {
-                if (category.Percent is not { } rate)
-                {
-                    findings.Add(new("BR-S-05", "A standard-rated VAT breakdown entry must have a rate (BT-119).", Path: "TaxTotals"));
-                    continue;
-                }
+                findings.Add(new("BR-CO-17",
+                    $"'{code}' is not a VAT category code EN16931 recognises (BT-118). Expected one of {string.Join(", ", VatCategories.Keys)}.",
+                    Path: "TaxTotals"));
+                continue;
+            }
 
-                var expected = Math.Round(subtotal.TaxableAmount.Value * rate / 100m, 2, MidpointRounding.AwayFromZero);
-                if (Math.Abs(expected - subtotal.TaxAmount.Value) > Tolerance)
-                {
-                    findings.Add(new("BR-S-09",
-                        $"VAT for the {rate}% breakdown entry is {subtotal.TaxAmount.Value}, but {subtotal.TaxableAmount.Value} at {rate}% is {expected}.",
-                        Path: "TaxTotals"));
-                }
+            CheckVatSubtotal(doc, subtotal, code, rules, findings);
+        }
+    }
 
-                // BR-S-08: the taxable amount is the sum of line net amounts at that rate.
-                var linesAtRate = doc.Lines
-                    .Where(l => string.Equals(l.Item?.ClassifiedTaxCategory?.Id?.Value, "S", StringComparison.Ordinal)
-                                && l.Item?.ClassifiedTaxCategory?.Percent == rate)
-                    .Sum(l => l.LineExtensionAmount?.Value ?? 0m);
+    private static void CheckVatSubtotal(
+        DocumentView doc,
+        TaxSubtotal subtotal,
+        string code,
+        VatCategoryRules rules,
+        List<ValidationFinding> findings)
+    {
+        var rate = subtotal.TaxCategory?.Percent;
 
-                var documentAdjustments = doc.AllowanceCharges
-                    .Where(a => string.Equals(a.TaxCategory?.Id?.Value, "S", StringComparison.Ordinal)
-                                && a.TaxCategory?.Percent == rate)
-                    .Sum(a => a.ChargeIndicator ? a.Amount.Value : -a.Amount.Value);
+        if (rules.RateMustBeAbsent)
+        {
+            if (rate is not null)
+            {
+                findings.Add(new($"{rules.Family}-08",
+                    $"A '{code}' breakdown entry must not carry a VAT rate (BT-119).",
+                    Path: "TaxTotals"));
+            }
+        }
+        else if (rate is null)
+        {
+            findings.Add(new($"{rules.Family}-05",
+                $"A '{code}' breakdown entry must have a VAT rate (BT-119).",
+                Path: "TaxTotals"));
+            return;
+        }
+        else if (rules.RequiresPositiveRate && rate <= 0)
+        {
+            findings.Add(new($"{rules.Family}-05",
+                $"A '{code}' breakdown entry must have a VAT rate greater than zero (BT-119).",
+                Path: "TaxTotals"));
+        }
+        else if (!rules.RequiresPositiveRate && rate != 0)
+        {
+            findings.Add(new($"{rules.Family}-05",
+                $"A '{code}' breakdown entry must have a VAT rate of zero (BT-119), but it is {rate}.",
+                Path: "TaxTotals"));
+        }
 
-                var expectedTaxable = linesAtRate + documentAdjustments;
-                if (Math.Abs(expectedTaxable - subtotal.TaxableAmount.Value) > Tolerance)
-                {
-                    findings.Add(new("BR-S-08",
-                        $"The taxable amount for the {rate}% entry is {subtotal.TaxableAmount.Value}, but the lines at that rate total {expectedTaxable}.",
-                        Path: "TaxTotals"));
-                }
+        // -09: the VAT amount follows from the taxable amount and the rate.
+        var effectiveRate = rate ?? 0m;
+        var expectedVat = Math.Round(
+            subtotal.TaxableAmount.Value * effectiveRate / 100m, 2, MidpointRounding.AwayFromZero);
+        if (Math.Abs(expectedVat - subtotal.TaxAmount.Value) > Tolerance)
+        {
+            findings.Add(new($"{rules.Family}-09",
+                $"VAT for the '{code}' entry is {subtotal.TaxAmount.Value}, but {subtotal.TaxableAmount.Value} at {effectiveRate}% is {expectedVat}.",
+                Path: "TaxTotals"));
+        }
+
+        // -10: where no VAT is charged, the document must say why.
+        if (rules.RequiresExemptionReason
+            && string.IsNullOrWhiteSpace(subtotal.TaxCategory?.TaxExemptionReason)
+            && string.IsNullOrWhiteSpace(subtotal.TaxCategory?.TaxExemptionReasonCode))
+        {
+            findings.Add(new($"{rules.Family}-10",
+                $"A '{code}' breakdown entry must state an exemption reason (BT-120) or reason code (BT-121).",
+                Path: "TaxTotals"));
+        }
+
+        // -08: the taxable amount is the sum of the line net amounts in that category, adjusted by
+        // any document-level allowances and charges assigned to it.
+        var linesInCategory = doc.Lines
+            .Where(l => string.Equals(l.Item?.ClassifiedTaxCategory?.Id?.Value, code, StringComparison.Ordinal)
+                        && l.Item?.ClassifiedTaxCategory?.Percent == rate)
+            .Sum(l => l.LineExtensionAmount?.Value ?? 0m);
+
+        var adjustments = doc.AllowanceCharges
+            .Where(a => string.Equals(a.TaxCategory?.Id?.Value, code, StringComparison.Ordinal)
+                        && a.TaxCategory?.Percent == rate)
+            .Sum(a => a.ChargeIndicator ? a.Amount.Value : -a.Amount.Value);
+
+        var expectedTaxable = linesInCategory + adjustments;
+        if (Math.Abs(expectedTaxable - subtotal.TaxableAmount.Value) > Tolerance)
+        {
+            findings.Add(new($"{rules.Family}-08",
+                $"The taxable amount for the '{code}' entry is {subtotal.TaxableAmount.Value}, but the lines in that category total {expectedTaxable}.",
+                Path: "TaxTotals"));
+        }
+
+        // BR-AE-02 / BR-AE-03: reverse charge requires both parties to be VAT-identified, since
+        // the liability moves to the buyer.
+        if (string.Equals(code, "AE", StringComparison.Ordinal))
+        {
+            if (!HasVatIdentifier(doc.Seller))
+            {
+                findings.Add(new("BR-AE-02",
+                    "Reverse charge requires the seller to have a VAT identifier (BT-31).", Path: "Seller"));
+            }
+
+            if (!HasVatIdentifier(doc.Buyer))
+            {
+                findings.Add(new("BR-AE-03",
+                    "Reverse charge requires the buyer to have a VAT identifier (BT-48).", Path: "Buyer"));
             }
         }
     }
+
+    private static bool HasVatIdentifier(Party party) =>
+        party.PartyTaxSchemes.Any(s => !string.IsNullOrWhiteSpace(s.CompanyId?.Value));
 
     private static void CheckPaymentTerms(DocumentView doc, List<ValidationFinding> findings)
     {
@@ -382,6 +511,37 @@ public static class CiusRoValidator
             findings.Add(new("BR-CO-25",
                 "When an amount is payable, the document must have a due date (BT-9) or payment terms (BT-20).",
                 Path: "DueDate"));
+        }
+    }
+
+    private static void CheckPeriods(DocumentView doc, List<ValidationFinding> findings)
+    {
+        CheckPeriod(doc.InvoicePeriod, "InvoicePeriod", findings);
+
+        foreach (var line in doc.Lines)
+        {
+            CheckPeriod(line.InvoicePeriod, $"{line.Path}.InvoicePeriod", findings);
+        }
+    }
+
+    private static void CheckPeriod(Period? period, string path, List<ValidationFinding> findings)
+    {
+        if (period is null) return;
+
+        // BR-CO-19: a period that is present must say when it starts, ends, or both.
+        if (period.StartDate is null && period.EndDate is null)
+        {
+            findings.Add(new("BR-CO-19",
+                "An invoicing period must have a start date (BT-73) or an end date (BT-74).", Path: path));
+            return;
+        }
+
+        // BR-29: the end cannot precede the start.
+        if (period is { StartDate: { } start, EndDate: { } end } && end < start)
+        {
+            findings.Add(new("BR-29",
+                $"The invoicing period ends on {end:yyyy-MM-dd}, before it starts on {start:yyyy-MM-dd}.",
+                Path: path));
         }
     }
 

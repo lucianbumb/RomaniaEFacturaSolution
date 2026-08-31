@@ -13,6 +13,7 @@ public static class UblSerializer
     // Constructing one per call also leaks a dynamic assembly per instance for some ctor overloads.
     private static readonly XmlSerializer InvoiceSerializer = new(typeof(UblInvoice));
     private static readonly XmlSerializer CreditNoteSerializer = new(typeof(UblCreditNote));
+    private static readonly XmlSerializer DebitNoteSerializer = new(typeof(UblDebitNote));
 
     private static readonly XmlSerializerNamespaces Namespaces = BuildNamespaces();
 
@@ -80,6 +81,16 @@ public static class UblSerializer
     {
         using var reader = CreateReader(xml);
         return (UblCreditNote)CreditNoteSerializer.Deserialize(reader)!;
+    }
+
+    /// <summary>
+    /// Deserializes a debit note from XML. There is no matching serialize method: debit notes
+    /// cannot be submitted to e-Factura, so the library only ever reads them.
+    /// </summary>
+    public static UblDebitNote DeserializeDebitNote(string xml)
+    {
+        using var reader = CreateReader(xml);
+        return (UblDebitNote)DebitNoteSerializer.Deserialize(reader)!;
     }
 
     /// <summary>

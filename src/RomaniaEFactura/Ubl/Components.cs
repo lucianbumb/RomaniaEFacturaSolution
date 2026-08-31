@@ -466,7 +466,37 @@ public sealed class Item
 
     /// <summary>VAT category applying to the item (BG-30).</summary>
     [XmlElement("ClassifiedTaxCategory", Namespace = UblNamespaces.Cac)]
-    public TaxCategory ClassifiedTaxCategory { get; set; } = new();
+    public LineTaxCategory ClassifiedTaxCategory { get; set; } = new();
+}
+
+/// <summary>
+/// The VAT category on a line (BG-30). Deliberately narrower than <see cref="TaxCategory"/>.
+/// </summary>
+/// <remarks>
+/// Rules UBL-CR-598 through UBL-CR-604 forbid a line's <c>ClassifiedTaxCategory</c> from carrying
+/// a base unit measure, a per-unit amount, an exemption reason or reason code, tier information,
+/// or a tax scheme name. The exemption reason belongs to the document-level VAT breakdown alone.
+/// Omitting those members makes the mistake impossible to express rather than merely detectable —
+/// worth doing because setting the reason in both places is a natural thing to try, and ANAF
+/// rejects it outright even though the Schematron marks the rule a warning.
+/// </remarks>
+public sealed class LineTaxCategory
+{
+    /// <summary>UNCL5305 category code (BT-151). <c>S</c> is standard rate.</summary>
+    [XmlElement("ID", Namespace = UblNamespaces.Cbc)]
+    public Identifier Id { get; set; } = "S";
+
+    /// <summary>VAT rate as a percentage (BT-152).</summary>
+    [XmlElement("Percent", Namespace = UblNamespaces.Cbc)]
+    public decimal? Percent { get; set; }
+
+    /// <summary>Indicates whether <see cref="Percent"/> is serialized.</summary>
+    [XmlIgnore]
+    public bool PercentSpecified => Percent.HasValue;
+
+    /// <summary>The scheme the category belongs to.</summary>
+    [XmlElement("TaxScheme", Namespace = UblNamespaces.Cac)]
+    public TaxScheme TaxScheme { get; set; } = new();
 }
 
 /// <summary>An item identifier.</summary>

@@ -54,6 +54,9 @@ internal sealed record DocumentView
     /// <summary>Payment terms (BT-20).</summary>
     public PaymentTerms? PaymentTerms { get; init; }
 
+    /// <summary>Invoicing period (BG-14).</summary>
+    public Period? InvoicePeriod { get; init; }
+
     /// <summary>Projects an invoice onto the common shape.</summary>
     public static DocumentView From(UblInvoice invoice) => new()
     {
@@ -75,11 +78,13 @@ internal sealed record DocumentView
             Item = l.Item,
             Price = l.Price,
             AllowanceCharges = l.AllowanceCharges,
+            InvoicePeriod = l.InvoicePeriod,
         })],
         TaxTotals = invoice.TaxTotals,
         Totals = invoice.LegalMonetaryTotal ?? new MonetaryTotal(),
         AllowanceCharges = invoice.AllowanceCharges,
         PaymentTerms = invoice.PaymentTerms,
+        InvoicePeriod = invoice.InvoicePeriod,
     };
 
     /// <summary>Projects a credit note onto the common shape.</summary>
@@ -104,11 +109,13 @@ internal sealed record DocumentView
             Item = l.Item,
             Price = l.Price,
             AllowanceCharges = l.AllowanceCharges,
+            InvoicePeriod = l.InvoicePeriod,
         })],
         TaxTotals = creditNote.TaxTotals,
         Totals = creditNote.LegalMonetaryTotal ?? new MonetaryTotal(),
         AllowanceCharges = creditNote.AllowanceCharges,
         PaymentTerms = creditNote.PaymentTerms,
+        InvoicePeriod = creditNote.InvoicePeriod,
     };
 }
 
@@ -135,6 +142,9 @@ internal sealed record LineView
 
     /// <summary>Line-level allowances and charges.</summary>
     public required IReadOnlyList<AllowanceCharge> AllowanceCharges { get; init; }
+
+    /// <summary>Period the line covers (BG-26).</summary>
+    public Period? InvoicePeriod { get; init; }
 
     /// <summary>A human-readable path to this line, for a finding.</summary>
     public string Path => $"Lines[{Index}]";

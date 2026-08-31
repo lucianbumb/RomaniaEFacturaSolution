@@ -139,4 +139,49 @@ public class UblSerializerTests
         // A downloaded archive can contain a JSON error body where a document was expected.
         Assert.Null(UblSerializer.ReadDocumentType("{\"eroare\":\"nu aveti drept\"}"));
     }
+
+    [Fact]
+    public void DeserializeDebitNote_ReadsAReceivedDocument()
+    {
+        // Debit notes are inbound only: ANAF's upload accepts UBL, CN, CII and RASP, so one
+        // cannot be sent, and there is deliberately no Serialize overload for the type.
+        const string xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <DebitNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"
+                       xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+                       xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+              <cbc:ID>DN-2026-001</cbc:ID>
+              <cbc:IssueDate>2026-08-31</cbc:IssueDate>
+              <cbc:DocumentCurrencyCode>RON</cbc:DocumentCurrencyCode>
+              <cac:RequestedMonetaryTotal>
+                <cbc:PayableAmount currencyID="RON">119.00</cbc:PayableAmount>
+              </cac:RequestedMonetaryTotal>
+              <cac:DebitNoteLine>
+                <cbc:ID>1</cbc:ID>
+                <cbc:DebitedQuantity unitCode="H87">1</cbc:DebitedQuantity>
+                <cbc:LineExtensionAmount currencyID="RON">100.00</cbc:LineExtensionAmount>
+                <cac:Item><cbc:Name>Penalitati</cbc:Name></cac:Item>
+                <cac:Price><cbc:PriceAmount currencyID="RON">100.00</cbc:PriceAmount></cac:Price>
+              </cac:DebitNoteLine>
+            </DebitNote>
+            """;
+
+        var debitNote = UblSerializer.DeserializeDebitNote(xml);
+
+        Assert.Equal("DN-2026-001", debitNote.Id.Value);
+        Assert.Equal(new DateTime(2026, 8, 31), debitNote.IssueDate);
+        Assert.Equal(119.00m, debitNote.RequestedMonetaryTotal.PayableAmount.Value);
+        var line = Assert.Single(debitNote.DebitNoteLines);
+        Assert.Equal(1m, line.DebitedQuantity.Value);
+        Assert.Equal("Penalitati", line.Item.Name);
+    }
+
+    [Fact]
+    public void ReadDocumentType_IdentifiesADebitNote()
+    {
+        const string xml =
+            """<DebitNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"/>""";
+
+        Assert.Equal("DebitNote", UblSerializer.ReadDocumentType(xml));
+    }
 }

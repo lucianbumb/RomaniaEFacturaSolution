@@ -70,7 +70,7 @@ public static class SampleDocuments
                     Item = new Item
                     {
                         Name = "Servicii de consultanta",
-                        ClassifiedTaxCategory = StandardRate(),
+                        ClassifiedTaxCategory = StandardRateLine(),
                     },
                     Price = new Price { PriceAmount = new Amount(100.00m) },
                 },
@@ -138,7 +138,7 @@ public static class SampleDocuments
                     Item = new Item
                     {
                         Name = "Storno servicii de consultanta",
-                        ClassifiedTaxCategory = StandardRate(),
+                        ClassifiedTaxCategory = StandardRateLine(),
                     },
                     Price = new Price { PriceAmount = new Amount(100.00m) },
                 },
@@ -146,7 +146,70 @@ public static class SampleDocuments
         };
     }
 
+    /// <summary>
+    /// An invoice under reverse charge (taxare inversă), which is routine in Romania.
+    /// </summary>
+    /// <remarks>
+    /// The whole document sits in VAT category AE at a zero rate, no VAT is charged, and the
+    /// exemption reason is mandatory because the liability moves to the buyer.
+    /// </remarks>
+    public static UblInvoice ReverseChargeInvoice()
+    {
+        const decimal net = 200.00m;
+
+        var invoice = MinimalInvoice();
+        invoice.Id = "FCT-2026-AE-001";
+
+        invoice.TaxTotals =
+        [
+            new TaxTotal
+            {
+                TaxAmount = new Amount(0.00m),
+                TaxSubtotals =
+                [
+                    new TaxSubtotal
+                    {
+                        TaxableAmount = new Amount(net),
+                        TaxAmount = new Amount(0.00m),
+                        TaxCategory = ReverseCharge(),
+                    },
+                ],
+            },
+        ];
+
+        invoice.LegalMonetaryTotal = new MonetaryTotal
+        {
+            LineExtensionAmount = new Amount(net),
+            TaxExclusiveAmount = new Amount(net),
+            TaxInclusiveAmount = new Amount(net),
+            PayableAmount = new Amount(net),
+        };
+
+        // The line category deliberately carries no exemption reason: UBL-CR-601 forbids it
+        // there, and LineTaxCategory has no such member.
+        invoice.InvoiceLines[0].Item.ClassifiedTaxCategory =
+            new LineTaxCategory { Id = "AE", Percent = 0m, TaxScheme = new TaxScheme { Id = "VAT" } };
+
+        return invoice;
+    }
+
+    /// <summary>The reverse-charge VAT category, with the exemption reason EN16931 requires.</summary>
+    public static TaxCategory ReverseCharge() => new()
+    {
+        Id = "AE",
+        Percent = 0m,
+        TaxExemptionReason = "Taxare inversa",
+        TaxScheme = new TaxScheme { Id = "VAT" },
+    };
+
     private static TaxCategory StandardRate() => new()
+    {
+        Id = "S",
+        Percent = 19m,
+        TaxScheme = new TaxScheme { Id = "VAT" },
+    };
+
+    private static LineTaxCategory StandardRateLine() => new()
     {
         Id = "S",
         Percent = 19m,

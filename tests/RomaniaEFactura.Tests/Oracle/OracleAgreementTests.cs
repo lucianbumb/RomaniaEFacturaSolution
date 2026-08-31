@@ -31,6 +31,15 @@ public class OracleAgreementTests
         "no-lines",
         "missing-item-name",
         "negative-unit-price",
+        // VAT categories beyond standard rate; reverse charge is routine in Romania.
+        "reverse-charge-valid",
+        "reverse-charge-without-exemption-reason",
+        "exempt-valid",
+        "exempt-without-exemption-reason",
+        "vat-total-does-not-match-breakdown",
+        "vat-id-without-country-prefix",
+        "period-end-before-start",
+        "unknown-vat-category",
     ];
 
     [RequiresAnafValidatorTheory]
@@ -118,11 +127,72 @@ public class OracleAgreementTests
                 invoice.InvoiceLines[0].Price.PriceAmount = new Amount(-100.00m);
                 break;
 
+            case "reverse-charge-valid":
+                return SampleDocuments.ReverseChargeInvoice();
+
+            case "reverse-charge-without-exemption-reason":
+            {
+                var ae = SampleDocuments.ReverseChargeInvoice();
+                ae.TaxTotals[0].TaxSubtotals[0].TaxCategory.TaxExemptionReason = null;
+                return ae;
+            }
+
+            case "exempt-valid":
+            {
+                var e = SampleDocuments.ReverseChargeInvoice();
+                SetCategory(e, "E", "Scutit conform art. 292");
+                return e;
+            }
+
+            case "exempt-without-exemption-reason":
+            {
+                var e = SampleDocuments.ReverseChargeInvoice();
+                SetCategory(e, "E", null);
+                return e;
+            }
+
+            case "vat-total-does-not-match-breakdown":
+                // BT-110 no longer equals the sum of BT-117.
+                invoice.TaxTotals[0].TaxAmount = new Amount(50.00m);
+                break;
+
+            case "vat-id-without-country-prefix":
+                invoice.AccountingSupplierParty.Party.PartyTaxSchemes[0].CompanyId =
+                    new Identifier(SampleDocuments.SellerCif);
+                break;
+
+            case "period-end-before-start":
+                invoice.InvoicePeriod = new Period
+                {
+                    StartDate = new DateTime(2026, 8, 31),
+                    EndDate = new DateTime(2026, 8, 1),
+                };
+                break;
+
+            case "unknown-vat-category":
+                invoice.TaxTotals[0].TaxSubtotals[0].TaxCategory.Id = new Identifier("X");
+                invoice.InvoiceLines[0].Item.ClassifiedTaxCategory.Id = new Identifier("X");
+                break;
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown corpus scenario.");
         }
 
         return invoice;
+    }
+
+    private static void SetCategory(UblInvoice invoice, string code, string? exemptionReason)
+    {
+        foreach (var category in invoice.TaxTotals.SelectMany(t => t.TaxSubtotals).Select(st => st.TaxCategory))
+        {
+            category.Id = new Identifier(code);
+            category.TaxExemptionReason = exemptionReason;
+        }
+
+        foreach (var line in invoice.InvoiceLines)
+        {
+            line.Item.ClassifiedTaxCategory.Id = new Identifier(code);
+        }
     }
 
     private static void SetCif(Party party, string cif)
