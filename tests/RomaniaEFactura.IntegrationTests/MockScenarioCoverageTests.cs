@@ -168,7 +168,7 @@ public class MockScenarioCoverageTests(MockAnafFixture fixture)
             new MemoryStream(await response.Content.ReadAsByteArrayAsync()), ZipArchiveMode.Read);
 
         // When the archive already holds a PDF, transformare is unnecessary.
-        var pdf = Assert.Single(archive.Entries.Where(e => e.Name.EndsWith(".pdf", StringComparison.Ordinal)));
+        var pdf = Assert.Single(archive.Entries, e => e.Name.EndsWith(".pdf", StringComparison.Ordinal));
         using var stream = pdf.Open();
         var head = new byte[5];
         Assert.Equal(5, await stream.ReadAtLeastAsync(head, 5, throwOnEndOfStream: false));
