@@ -36,6 +36,8 @@ public class EditModelOracleTests
         // BG-11: a foreign seller invoicing through a Romanian fiscal representative.
         "tax-representative",
         "tax-representative-in-bucharest",
+        // BG-32: structured attributes on a line, which the buyer's system can act on.
+        "item-attributes",
     ];
 
     [RequiresAnafValidatorTheory]
@@ -191,6 +193,17 @@ public class EditModelOracleTests
                 var invoice = SampleEditModels.MinimalInvoice();
                 invoice.Lines[0].Quantity = 7m;
                 invoice.Lines[0].UnitPrice = 12.3456m;
+                return invoice;
+            }
+
+            case "item-attributes":
+            {
+                var invoice = SampleEditModels.MinimalInvoice();
+                invoice.Lines[0].ItemAttributes =
+                [
+                    new ItemAttributeEditModel { Name = "Culoare", Value = "Albastru" },
+                    new ItemAttributeEditModel { Name = "Serie", Value = "SN-4417" },
+                ];
                 return invoice;
             }
 

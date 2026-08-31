@@ -282,6 +282,18 @@ public abstract class DocumentEditModel : IValidatableObject
                 [nameof(Notes)]);
         }
 
+        // BR-RO-A052. Checked here rather than on the line, because a count is a property of the
+        // list and DataAnnotations has no way to express one.
+        var overloadedLine = Lines.FindIndex(
+            line => line.ItemAttributes.Count > CiusRoLengths.MaxItemAttributes);
+        if (overloadedLine >= 0)
+        {
+            yield return new ValidationResult(
+                $"Line {overloadedLine + 1} carries {Lines[overloadedLine].ItemAttributes.Count} item "
+                + $"attributes; CIUS-RO allows {CiusRoLengths.MaxItemAttributes} (BR-RO-A052).",
+                [nameof(Lines)]);
+        }
+
         if (PrecedingDocuments.Count > CiusRoLengths.MaxPrecedingDocuments)
         {
             yield return new ValidationResult(

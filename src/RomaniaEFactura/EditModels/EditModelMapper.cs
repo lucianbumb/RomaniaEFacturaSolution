@@ -166,6 +166,14 @@ public static class EditModelMapper
                     Id = line.VatCategory.ToCode(),
                     Percent = line.EffectiveVatRate,
                 },
+                AdditionalItemProperties =
+                [
+                    .. line.ItemAttributes.Select(attribute => new ItemProperty
+                    {
+                        Name = attribute.Name,
+                        Value = attribute.Value,
+                    })
+                ],
             },
             Price = new Price
             {

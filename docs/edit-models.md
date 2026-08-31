@@ -112,11 +112,34 @@ category — and validating one field in isolation leaves stale messages on the 
 - **RON only.** BR-RO-030 requires a foreign-currency document to state its VAT in RON as well
   (BT-6 and BT-111), which the mapper does not yet produce. Rather than build a document ANAF would
   refuse, the model refuses it first and points at `SendRawXmlAsync`.
-- **A seller tax representative (BG-11) is not modelled.**
-- **Item attributes (BG-32) and supporting documents (BG-24) are not modelled.**
+- **Supporting documents and attachments (BG-24) are not modelled**, nor is card payment
+  (BT-87/88) or a third address line. Tracked in
+  [#23](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/23).
 
 Anything the model cannot express goes through `SendRawXmlAsync`, which is unverified: the promise
 about format does not extend to it.
+
+## Describing what was sold
+
+`Name` and `Description` are prose. `ItemAttributes` is structured — name and value pairs a buyer's
+system can act on:
+
+```csharp
+line.ItemAttributes =
+[
+    new ItemAttributeEditModel { Name = "Culoare", Value = "Albastru" },
+    new ItemAttributeEditModel { Name = "Serie",   Value = "SN-4417" },
+];
+```
+
+Both halves are required (BR-54), the name is capped at 50 characters and the value at 100 — an
+asymmetry that is easy to get backwards — and a line may carry at most 50.
+
+## Selling into Romania from abroad
+
+A seller not established in Romania appoints a fiscal representative, and the invoice must name
+them. Set `TaxRepresentative`; the same address rules apply to it as to the seller, including the
+Bucharest sector rule.
 
 ## Credit notes and buyer messages
 
