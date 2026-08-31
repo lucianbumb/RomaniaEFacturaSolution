@@ -67,7 +67,9 @@ impossible to fail rather than merely caught.
 | `tests/RomaniaEFactura.IntegrationTests` | Full lifecycle against the mock server |
 | `samples/MockAnafServer` | A local stand-in for ANAF, so everything is testable without credentials |
 | `samples/SampleWebApp` | Blazor Server app exercising every method — doubles as documentation |
+| `tests/RomaniaEFactura.LiveTests` | The run against ANAF itself. Inert unless deliberately configured |
 | `docs/edit-models.md` | Filling in an invoice: what the model derives, and the Romanian rules that surprise |
+| `docs/live-run.md` | Running against ANAF's real test environment — needs credentials and a certificate |
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
 | `documentation_efactura/` | ANAF's own published specifications |
 

@@ -310,9 +310,15 @@ it is noticed.
 
 ## Open questions
 
-| Question | Resolved by |
-|---|---|
-| Scope of the daily quotas — per-id, per-CIF, or per-application | M8 |
-| Real-world timing of `in prelucrare` → `ok`, to calibrate the reconciler's backoff | M8 |
-| Whether the RASP message shape above is what ANAF actually accepts | M8 |
-| Whether `extern=DA` makes the live service accept a foreign-buyer invoice the offline validator refuses | M8 |
+Each of these has a test waiting for it in `tests/RomaniaEFactura.LiveTests`, which runs against
+ANAF's test environment. See [live-run.md](live-run.md) — the run needs credentials and a person
+with a qualified certificate, so it cannot be automated.
+
+| Question | Answered by | Status |
+|---|---|---|
+| Scope of the daily quotas — per-id, per-CIF, or per-application | `QuotaScopeTests` | not yet run |
+| Real-world timing of `in prelucrare` → `ok`, to calibrate the reconciler's backoff | `LifecycleTests` | not yet run |
+| Whether the RASP message shape above is what ANAF actually accepts | `OpenQuestionTests` | not yet run |
+| Whether `extern=DA` makes the live service accept a foreign-buyer invoice the offline validator refuses | `OpenQuestionTests` | not yet run |
+
+Fill in the answers here when the run happens, and fix the mock to match — never the client.
