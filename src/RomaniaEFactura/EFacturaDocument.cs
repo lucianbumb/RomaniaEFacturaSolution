@@ -61,6 +61,39 @@ public sealed record EFacturaDocument
 }
 
 /// <summary>
+/// How much an archive is allowed to expand to.
+/// </summary>
+/// <remarks>
+/// <para>
+/// DEFLATE reaches roughly a thousand to one, so an archive small enough to arrive unremarked
+/// expands to more memory than the process has. Nothing in a ZIP says how big it will turn out to
+/// be — the recorded sizes are written by whoever built the archive — so the only honest defence is
+/// to stop reading once a budget is spent.
+/// </para>
+/// <para>
+/// The defaults are far above anything real. ANAF caps an upload at 10 MB, and a downloaded archive
+/// is one document, its signature and occasionally a PDF.
+/// </para>
+/// </remarks>
+public sealed record ArchiveLimits
+{
+    /// <summary>The limits applied when a caller names none.</summary>
+    public static ArchiveLimits Default { get; } = new();
+
+    /// <summary>
+    /// The most an archive may expand to in total, counted across every entry and every level of
+    /// nesting rather than per entry.
+    /// </summary>
+    public long MaxTotalUncompressedBytes { get; init; } = 64L * 1024 * 1024;
+
+    /// <summary>The most entries an archive may hold, counted across nesting in the same way.</summary>
+    public int MaxEntries { get; init; } = 256;
+
+    /// <summary>How many archives deep the reader will follow before it stops.</summary>
+    public int MaxNestingDepth { get; init; } = 4;
+}
+
+/// <summary>
 /// Reads the archives ANAF returns from <c>descarcare</c>.
 /// </summary>
 public static partial class EFacturaArchiveReader
@@ -69,13 +102,19 @@ public static partial class EFacturaArchiveReader
     /// Extracts and identifies the document in an archive.
     /// </summary>
     /// <param name="archive">The ZIP bytes returned by ANAF.</param>
-    /// <exception cref="InvalidDataException">The archive holds no recognisable document.</exception>
-    public static EFacturaDocument Read(byte[] archive)
+    /// <param name="limits">
+    /// How far the archive may be allowed to expand. Omit it for <see cref="ArchiveLimits.Default"/>,
+    /// which is generous enough that no real e-Factura archive approaches it.
+    /// </param>
+    /// <exception cref="InvalidDataException">
+    /// The archive holds no recognisable document, or it expands past <paramref name="limits"/>.
+    /// </exception>
+    public static EFacturaDocument Read(byte[] archive, ArchiveLimits? limits = null)
     {
         ArgumentNullException.ThrowIfNull(archive);
 
         var entries = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
-        Collect(archive, entries, depth: 0);
+        Collect(archive, entries, new Budget(limits ?? ArchiveLimits.Default), depth: 0);
 
         var signature = entries
             .FirstOrDefault(e => e.Key.StartsWith("semnatura", StringComparison.OrdinalIgnoreCase)
@@ -111,30 +150,103 @@ public static partial class EFacturaArchiveReader
     /// Collects every file in the archive, following nested archives.
     /// </summary>
     /// <remarks>
-    /// Real archives are sometimes a ZIP inside a ZIP. The depth limit guards against a crafted
-    /// archive that nests indefinitely.
+    /// Real archives are sometimes a ZIP inside a ZIP. Depth was already limited; the budget limits
+    /// the two dimensions that matter more, since one entry at depth zero can expand to more than
+    /// the machine has.
     /// </remarks>
-    private static void Collect(byte[] archive, Dictionary<string, byte[]> entries, int depth)
+    private static void Collect(
+        byte[] archive,
+        Dictionary<string, byte[]> entries,
+        Budget budget,
+        int depth)
     {
-        if (depth > 4) return;
+        if (depth > budget.Limits.MaxNestingDepth) return;
 
         using var stream = new MemoryStream(archive);
         using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
 
         foreach (var entry in zip.Entries)
         {
+            budget.CountEntry(entry.FullName);
+
             using var entryStream = entry.Open();
-            using var buffer = new MemoryStream();
-            entryStream.CopyTo(buffer);
-            var content = buffer.ToArray();
+            var content = budget.ReadWithinBudget(entryStream, entry.FullName);
 
             if (entry.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                Collect(content, entries, depth + 1);
+                Collect(content, entries, budget, depth + 1);
                 continue;
             }
 
             entries[entry.Name] = content;
+        }
+    }
+
+    /// <summary>
+    /// What is left of an archive's allowance, shared across the whole recursive walk.
+    /// </summary>
+    /// <remarks>
+    /// Shared rather than per archive because everything collected is held at once: a nested
+    /// archive costs its own decompressed bytes and then its children's on top of them.
+    /// </remarks>
+    private sealed class Budget(ArchiveLimits limits)
+    {
+        private long _bytesRemaining = limits.MaxTotalUncompressedBytes;
+        private int _entriesRemaining = limits.MaxEntries;
+
+        public ArchiveLimits Limits { get; } = limits;
+
+        public void CountEntry(string name)
+        {
+            if (--_entriesRemaining < 0)
+            {
+                throw new InvalidDataException(
+                    $"The archive holds more than {Limits.MaxEntries} entries, which no e-Factura "
+                    + $"archive does. Refused at '{Describe(name)}'.");
+            }
+        }
+
+        /// <summary>
+        /// Copies an entry, stopping the moment it costs more than is left.
+        /// </summary>
+        /// <remarks>
+        /// The check belongs during the copy, not before or after it. A ZIP records its own
+        /// uncompressed sizes and whoever built it wrote them, so consulting
+        /// <c>ZipArchiveEntry.Length</c> first would trust the very thing being defended against —
+        /// and reading the entry whole in order to measure it is the allocation the limit exists to
+        /// prevent.
+        /// </remarks>
+        public byte[] ReadWithinBudget(Stream source, string name)
+        {
+            using var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+
+            int read;
+            while ((read = source.Read(chunk, 0, chunk.Length)) > 0)
+            {
+                _bytesRemaining -= read;
+                if (_bytesRemaining < 0)
+                {
+                    throw new InvalidDataException(
+                        $"The archive expands past {Limits.MaxTotalUncompressedBytes:N0} bytes, which "
+                        + "no e-Factura archive does — ANAF caps an upload at 10 MB. Refused while "
+                        + $"reading '{Describe(name)}'.");
+                }
+
+                buffer.Write(chunk, 0, read);
+            }
+
+            return buffer.ToArray();
+        }
+
+        /// <summary>
+        /// Renders an entry name for a message. The name is written by whoever built the archive,
+        /// so it is stripped of anything that would forge a line in a log, and shortened.
+        /// </summary>
+        private static string Describe(string name)
+        {
+            var clean = new string([.. name.Where(c => !char.IsControl(c))]);
+            return clean.Length <= 100 ? clean : clean[..100] + "...";
         }
     }
 
