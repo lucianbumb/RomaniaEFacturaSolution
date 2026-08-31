@@ -41,8 +41,8 @@ public sealed class RomaniaEFacturaService(
     }
 
     /// <inheritdoc />
-    public Uri BuildAuthorizationUrl(string? cif = null, string? returnUrl = null) =>
-        oauth.BuildAuthorizationUrl(ResolveCif(cif), returnUrl);
+    public Uri BuildAuthorizationUrl(string? cif = null, string? returnUrl = null, string? user = null) =>
+        oauth.BuildAuthorizationUrl(ResolveCif(cif), returnUrl, user);
 
     /// <inheritdoc />
     public Task DisconnectAsync(string? cif = null, CancellationToken cancellationToken = default) =>

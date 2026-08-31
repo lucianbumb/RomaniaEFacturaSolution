@@ -19,7 +19,13 @@ public interface IAnafOAuthClient
     /// physical token, presented by a real browser. Any design that assumes authorization can be
     /// obtained headlessly is wrong.
     /// </remarks>
-    Uri BuildAuthorizationUrl(string cif, string? returnUrl = null);
+    /// <param name="cif">The company to authorize.</param>
+    /// <param name="returnUrl">Where to send the person once the callback completes.</param>
+    /// <param name="user">
+    /// Who is starting the round trip, carried in the protected state so the callback can refuse
+    /// one completed by somebody else.
+    /// </param>
+    Uri BuildAuthorizationUrl(string cif, string? returnUrl = null, string? user = null);
 
     /// <summary>Exchanges the callback's authorization code for tokens.</summary>
     Task<AnafResult<EFacturaToken>> ExchangeCodeAsync(
@@ -46,7 +52,7 @@ public sealed class AnafOAuthClient(
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
 
     /// <inheritdoc />
-    public Uri BuildAuthorizationUrl(string cif, string? returnUrl = null)
+    public Uri BuildAuthorizationUrl(string cif, string? returnUrl = null, string? user = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cif);
 
@@ -59,7 +65,7 @@ public sealed class AnafOAuthClient(
             ["scope"] = "efactura",
             // The state is protected, so a forged callback cannot choose the company or the
             // post-callback redirect.
-            ["state"] = stateProtector.Protect(normalized, returnUrl),
+            ["state"] = stateProtector.Protect(normalized, returnUrl, user),
             // ANAF requires this, and returns an opaque token without it.
             ["token_content_type"] = "jwt",
         };

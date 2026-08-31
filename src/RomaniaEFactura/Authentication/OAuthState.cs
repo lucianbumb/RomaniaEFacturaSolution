@@ -8,7 +8,16 @@ namespace RomaniaEFactura.Authentication;
 /// <param name="ReturnUrl">Where to send the user once the callback completes.</param>
 /// <param name="Nonce">Makes each state unique, so one cannot be replayed.</param>
 /// <param name="IssuedAt">When the state was created, used to reject stale callbacks.</param>
-public sealed record OAuthState(string Cif, string? ReturnUrl, string Nonce, DateTimeOffset IssuedAt);
+/// <param name="User">
+/// Who started the round trip, so a callback returning as somebody else can be refused. Null when
+/// nobody was signed in, which is the case only where the endpoints were mounted anonymously.
+/// </param>
+public sealed record OAuthState(
+    string Cif,
+    string? ReturnUrl,
+    string Nonce,
+    DateTimeOffset IssuedAt,
+    string? User = null);
 
 /// <summary>
 /// Protects the OAuth <c>state</c> parameter so a callback cannot be forged.
@@ -38,7 +47,14 @@ public sealed class OAuthStateProtector(IDataProtectionProvider dataProtectionPr
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
 
     /// <summary>Creates a protected state for an authorization request.</summary>
-    public string Protect(string cif, string? returnUrl)
+    /// <param name="cif">The company being authorized.</param>
+    /// <param name="returnUrl">Where to send the person once the callback completes.</param>
+    /// <param name="user">
+    /// Who is starting the round trip. Carried so the callback can refuse a state completed by a
+    /// different person, which is what stops one authenticated user handing another a link that
+    /// binds the first user's ANAF identity to the application.
+    /// </param>
+    public string Protect(string cif, string? returnUrl, string? user = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cif);
 
@@ -46,7 +62,8 @@ public sealed class OAuthStateProtector(IDataProtectionProvider dataProtectionPr
             cif,
             returnUrl,
             Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
-            Clock());
+            Clock(),
+            user);
 
         return _protector.Protect(JsonSerializer.Serialize(state));
     }
