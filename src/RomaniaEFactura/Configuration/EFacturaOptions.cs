@@ -64,6 +64,25 @@ public sealed class EFacturaOptions
     /// </summary>
     public TimeSpan MinimumDelayBetweenCalls { get; set; } = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>Whether the background reconciler runs.</summary>
+    /// <remarks>
+    /// Turning it off leaves submissions permanently unresolved unless something else calls the
+    /// reconciler, so it is only appropriate when another process owns reconciliation.
+    /// </remarks>
+    public bool EnableReconciler { get; set; } = true;
+
+    /// <summary>
+    /// How often the reconciler looks for work.
+    /// </summary>
+    /// <remarks>
+    /// This is not how often ANAF is called. Each submission has its own widening schedule, so a
+    /// short interval here only means a document that has become due is picked up sooner.
+    /// </remarks>
+    public TimeSpan ReconcileInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>How many submissions one reconciliation pass will handle.</summary>
+    public int ReconcileBatchSize { get; set; } = 25;
+
     /// <summary>The API base address actually in use.</summary>
     public Uri ResolvedApiBaseAddress => ApiBaseAddress ?? new Uri(
         Environment == EFacturaEnvironment.Production
