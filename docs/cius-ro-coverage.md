@@ -49,6 +49,10 @@ them. See `CiusRoLengths`, and the table in [anaf-wire-formats.md](anaf-wire-for
 These rules cap or constrain fields the library has no model for, so nothing can violate them
 through its API. Sending such a document requires `SendRawXmlAsync`, which carries no guarantee.
 
+Modelling them is tracked as
+[#23](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/23). Until then, a field's
+absence from this library is the reason its rules are not checked — not an oversight.
+
 | Fields | Rules |
 |---|---|
 | Seller tax representative (BG-11) | `BR-RO-140`, `150`, `160`, `170`, `L0203`, `L0503`, `L153`, `L1012`, `L1013`, `L206` |
