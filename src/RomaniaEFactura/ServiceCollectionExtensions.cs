@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using RomaniaEFactura.Authentication;
 using RomaniaEFactura.Configuration;
 using RomaniaEFactura.Persistence;
@@ -33,7 +34,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
-        builder.Services.Configure(configure);
+        builder.Services.AddOptions<EFacturaOptions>().Configure(configure).ValidateOnStart();
         AddCore(builder.Services, configureDatabase);
         return builder;
     }
@@ -51,7 +52,9 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.Configure<EFacturaOptions>(builder.Configuration.GetSection(sectionName));
+        builder.Services.AddOptions<EFacturaOptions>()
+            .Bind(builder.Configuration.GetSection(sectionName))
+            .ValidateOnStart();
         AddCore(builder.Services, configureDatabase);
         return builder;
     }
@@ -60,6 +63,12 @@ public static class ServiceCollectionExtensions
     {
         // Registered rather than taken statically so a host - or a test - can substitute a clock.
         services.TryAddSingleton(TimeProvider.System);
+
+        // Checked at startup rather than on the first ANAF call. A missing client secret otherwise
+        // arrives as a 401 that reads like an expired authorization, and a plaintext base address
+        // is never reported at all.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<EFacturaOptions>, EFacturaOptionsValidator>());
 
         services.AddDataProtection();
         services.AddHttpClient(AnafApiClient.HttpClientName);
