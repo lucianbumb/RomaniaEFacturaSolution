@@ -17,7 +17,7 @@ public sealed class PartyEditModel : IValidatableObject
 {
     /// <summary>Registered legal name (BT-27 / BT-44).</summary>
     [Required(ErrorMessage = "The registered name is required.")]
-    [StringLength(200, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.PartyName, MinimumLength = 1)]
     [Display(Name = "Registered name")]
     public string Name { get; set; } = string.Empty;
 
@@ -55,12 +55,12 @@ public sealed class PartyEditModel : IValidatableObject
     public string? VatNumber { get; set; }
 
     /// <summary>Trade register number, such as <c>J40/1234/2020</c> (BT-33).</summary>
-    [StringLength(100)]
+    [StringLength(CiusRoLengths.CompanyLegalForm)]
     [Display(Name = "Trade register number")]
     public string? TradeRegisterNumber { get; set; }
 
     /// <summary>Trading name where it differs from the registered one (BT-28 / BT-45).</summary>
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.TradingName)]
     [Display(Name = "Trading name")]
     public string? TradingName { get; set; }
 
@@ -69,19 +69,19 @@ public sealed class PartyEditModel : IValidatableObject
     public AddressEditModel Address { get; set; } = new();
 
     /// <summary>Contact name (BT-41 / BT-56).</summary>
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.ContactName)]
     [Display(Name = "Contact name")]
     public string? ContactName { get; set; }
 
     /// <summary>Contact telephone (BT-42 / BT-57).</summary>
     [Phone]
-    [StringLength(50)]
+    [StringLength(CiusRoLengths.ContactTelephone)]
     [Display(Name = "Telephone")]
     public string? Telephone { get; set; }
 
     /// <summary>Contact email (BT-43 / BT-58).</summary>
     [EmailAddress]
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.ContactEmail)]
     [Display(Name = "Email")]
     public string? Email { get; set; }
 
@@ -119,12 +119,12 @@ public sealed class AddressEditModel : IValidatableObject
 {
     /// <summary>Street name and number (BT-35).</summary>
     [Required(ErrorMessage = "The street address is required.")]
-    [StringLength(150, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.AddressLine1, MinimumLength = 1)]
     [Display(Name = "Street")]
     public string Street { get; set; } = string.Empty;
 
     /// <summary>A second address line (BT-36).</summary>
-    [StringLength(150)]
+    [StringLength(CiusRoLengths.AddressLine2)]
     [Display(Name = "Address line 2")]
     public string? StreetAdditional { get; set; }
 
@@ -137,12 +137,12 @@ public sealed class AddressEditModel : IValidatableObject
     /// Rule BR-RO-100, checked wherever both this and <see cref="County"/> are in view.
     /// </remarks>
     [Required(ErrorMessage = "The city is required.")]
-    [StringLength(100, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.City, MinimumLength = 1)]
     [Display(Name = "City")]
     public string City { get; set; } = string.Empty;
 
     /// <summary>Post code (BT-38).</summary>
-    [StringLength(20)]
+    [StringLength(CiusRoLengths.PostalCode)]
     [Display(Name = "Post code")]
     public string? PostalCode { get; set; }
 

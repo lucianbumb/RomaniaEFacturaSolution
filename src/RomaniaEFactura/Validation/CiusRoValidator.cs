@@ -51,6 +51,10 @@ public static class CiusRoValidator
         CheckPaymentTerms(doc, findings);
         CheckPeriods(doc, findings);
 
+        // The BR-RO-L* and BR-RO-A* families, applied here so a document built directly as UBL is
+        // held to the same limits the edit models enforce through their attributes.
+        CiusRoLengthRules.Check(doc, findings);
+
         return new ValidationReport(findings);
     }
 

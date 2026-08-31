@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using RomaniaEFactura.Validation;
 using RomaniaEFactura.EditModels.Attributes;
 
 namespace RomaniaEFactura.EditModels;
@@ -26,7 +27,7 @@ public sealed class DocumentAllowanceChargeEditModel : IValidatableObject
 
     /// <summary>Why it applies (BT-97 / BT-104).</summary>
     [Required(ErrorMessage = "A document-level discount or charge must state a reason.")]
-    [StringLength(200, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.DocumentAdjustmentReason, MinimumLength = 1)]
     [Display(Name = "Reason")]
     public string Reason { get; set; } = string.Empty;
 
@@ -88,12 +89,12 @@ public sealed class PaymentEditModel : IValidatableObject
     public string? Iban { get; set; }
 
     /// <summary>The account holder's name (BT-85).</summary>
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.PaymentAccountName)]
     [Display(Name = "Account holder")]
     public string? AccountHolder { get; set; }
 
     /// <summary>Remittance reference for the payer to quote (BT-83).</summary>
-    [StringLength(100)]
+    [StringLength(CiusRoLengths.RemittanceInformation)]
     [Display(Name = "Payment reference")]
     public string? Reference { get; set; }
 
@@ -118,7 +119,7 @@ public sealed class DocumentReferenceEditModel
 {
     /// <summary>The referenced document's number (BT-25).</summary>
     [Required(ErrorMessage = "The referenced document number is required.")]
-    [StringLength(50, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.PrecedingDocumentNumber, MinimumLength = 1)]
     [Display(Name = "Document number")]
     public string Number { get; set; } = string.Empty;
 

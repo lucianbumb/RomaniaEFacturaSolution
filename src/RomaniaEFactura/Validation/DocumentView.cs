@@ -60,6 +60,15 @@ internal sealed record DocumentView
     /// <summary>Delivery details (BG-13), which carry an address of their own.</summary>
     public Delivery? Delivery { get; init; }
 
+    /// <summary>Free-text notes (BT-22), which CIUS-RO caps by both count and length.</summary>
+    public required IReadOnlyList<string> Notes { get; init; }
+
+    /// <summary>How many preceding documents are referenced (BG-3).</summary>
+    public required int PrecedingDocumentCount { get; init; }
+
+    /// <summary>How many supporting documents are attached (BG-24).</summary>
+    public required int SupportingDocumentCount { get; init; }
+
     /// <summary>Projects an invoice onto the common shape.</summary>
     public static DocumentView From(UblInvoice invoice) => new()
     {
@@ -76,6 +85,7 @@ internal sealed record DocumentView
         {
             Index = i,
             Id = l.Id?.Value ?? string.Empty,
+            Note = l.Note,
             Quantity = l.InvoicedQuantity,
             LineExtensionAmount = l.LineExtensionAmount,
             Item = l.Item,
@@ -89,6 +99,9 @@ internal sealed record DocumentView
         PaymentTerms = invoice.PaymentTerms,
         InvoicePeriod = invoice.InvoicePeriod,
         Delivery = invoice.Delivery,
+        Notes = invoice.Notes,
+        PrecedingDocumentCount = invoice.BillingReferences.Count,
+        SupportingDocumentCount = invoice.AdditionalDocumentReferences.Count,
     };
 
     /// <summary>Projects a credit note onto the common shape.</summary>
@@ -108,6 +121,7 @@ internal sealed record DocumentView
         {
             Index = i,
             Id = l.Id?.Value ?? string.Empty,
+            Note = l.Note,
             Quantity = l.CreditedQuantity,
             LineExtensionAmount = l.LineExtensionAmount,
             Item = l.Item,
@@ -121,6 +135,9 @@ internal sealed record DocumentView
         PaymentTerms = creditNote.PaymentTerms,
         InvoicePeriod = creditNote.InvoicePeriod,
         Delivery = creditNote.Delivery,
+        Notes = creditNote.Notes,
+        PrecedingDocumentCount = creditNote.BillingReferences.Count,
+        SupportingDocumentCount = creditNote.AdditionalDocumentReferences.Count,
     };
 }
 
@@ -132,6 +149,9 @@ internal sealed record LineView
 
     /// <summary>Line identifier (BT-126).</summary>
     public required string Id { get; init; }
+
+    /// <summary>Free-text note for the line (BT-127), which CIUS-RO caps at 300 characters.</summary>
+    public string? Note { get; init; }
 
     /// <summary>Quantity (BT-129) and its unit code (BT-130).</summary>
     public Quantity? Quantity { get; init; }
