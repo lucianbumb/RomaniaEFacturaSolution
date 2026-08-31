@@ -38,14 +38,23 @@
 
   <!-- The envelope reader is internal because nothing outside the transport should be deciding
        whether an ANAF response succeeded, but it needs testing directly against real bodies. -->
+  <!-- The library ships the OAuth connect and callback endpoints, so it needs the ASP.NET
+       framework. That is a deliberate consequence of targeting web applications: the callback is
+       easy to get subtly wrong, and leaving it to each consumer invites CSRF and open-redirect
+       bugs. What must NOT happen - and does not - is HttpContext appearing in the token store
+       contract, which is what made the previous version unusable from background jobs. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="RomaniaEFactura.Tests" />
     <InternalsVisibleTo Include="RomaniaEFactura.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
   </ItemGroup>
 
 </Project>
