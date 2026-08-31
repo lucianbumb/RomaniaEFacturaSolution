@@ -223,7 +223,8 @@ public class OAuthFlowTests(MockAnafFixture fixture) : IClassFixture<MockAnafFix
     /// <summary>Returns a fixed outcome, so refusal handling can be tested without the mock.</summary>
     private sealed class StubOAuthClient(AnafResult<EFacturaToken> outcome) : IAnafOAuthClient
     {
-        public Uri BuildAuthorizationUrl(string cif, string? returnUrl = null) => new("https://example.invalid");
+        public Uri BuildAuthorizationUrl(string cif, string? returnUrl = null, string? user = null) =>
+            new("https://example.invalid");
 
         public Task<AnafResult<EFacturaToken>> ExchangeCodeAsync(
             string code, string cif, CancellationToken cancellationToken = default) =>

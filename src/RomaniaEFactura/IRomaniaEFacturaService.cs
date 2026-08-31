@@ -29,7 +29,14 @@ public interface IRomaniaEFacturaService
         CancellationToken cancellationToken = default);
 
     /// <summary>Builds the URL a person visits to authorize a company.</summary>
-    Uri BuildAuthorizationUrl(string? cif = null, string? returnUrl = null);
+    /// <param name="cif">The company to authorize, or null for the configured one.</param>
+    /// <param name="returnUrl">Where to send the person once the callback completes.</param>
+    /// <param name="user">
+    /// Who is starting the round trip. Supply it when building the URL yourself rather than using
+    /// the mapped endpoint: the callback refuses a state completed by a different person, and can
+    /// only do so for a state that recorded one.
+    /// </param>
+    Uri BuildAuthorizationUrl(string? cif = null, string? returnUrl = null, string? user = null);
 
     /// <summary>Removes a company's authorization.</summary>
     Task DisconnectAsync(string? cif = null, CancellationToken cancellationToken = default);

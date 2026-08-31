@@ -16,7 +16,10 @@ dotnet run --project samples/MockAnafServer/MockAnafServer.csproj --urls http://
 dotnet run --project samples/SampleWebApp/SampleWebApp.csproj --urls http://localhost:5203
 ```
 
-Then open <http://localhost:5203> and click **Authorize with ANAF** on the Connection page. Against
+Then open <http://localhost:5203> and click **Authorize with ANAF** on the Connection page. The
+library requires an authenticated user on its two endpoints, so the sample signs you in first
+through a stand-in `/sign-in` — a real application uses its own identity system, and
+[docs/security.md](../../docs/security.md) explains why the requirement is not optional. Against
 the mock that completes immediately; against the real service it asks for a qualified certificate.
 
 `appsettings.json` points `ApiBaseAddress` and `OAuthBaseAddress` at the mock. Remove both to talk

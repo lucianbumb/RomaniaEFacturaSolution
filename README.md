@@ -58,6 +58,26 @@ It also computes what EN16931 makes you state and then checks: line net amounts,
 totals, and the VAT breakdown. You enter quantities and prices; the arithmetic rules become
 impossible to fail rather than merely caught.
 
+### Connecting a company
+
+Somebody has to authorize the company at ANAF once, in a browser, with a qualified digital
+certificate — there is no headless path. The library ships the two endpoints that carry them
+through it:
+
+```csharp
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Mounts /efactura/connect/{cif} and /efactura/callback.
+app.MapEFacturaAuthorization(options => options.Policy = "efactura-administrators");
+```
+
+**They require an authenticated user**, and mapping them in an application that has registered no
+authorization services fails at startup. The callback writes an ANAF authorization into the token
+store, and an authorization left open to anonymous callers can be replaced by anyone holding their
+own certificate. [docs/security.md](docs/security.md) explains what that costs and how to narrow
+access further.
+
 ## Repository layout
 
 | Path | What it is |
@@ -71,6 +91,7 @@ impossible to fail rather than merely caught.
 | `docs/edit-models.md` | Filling in an invoice: what the model derives, and the Romanian rules that surprise |
 | `docs/live-run.md` | Running against ANAF's real test environment — needs credentials and a certificate |
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
+| `docs/security.md` | What the library protects, what the host application owns, and why |
 | `documentation_efactura/` | ANAF's own published specifications |
 
 ## Contributing
