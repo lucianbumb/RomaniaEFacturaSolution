@@ -20,3 +20,23 @@ public sealed class RequiresAnafValidatorFactAttribute : FactAttribute
         }
     }
 }
+
+/// <summary>
+/// A theory whose cases can only run when ANAF's offline validator is available.
+/// </summary>
+/// <remarks>
+/// Skipping has to be decided on the attribute because xUnit v2 has no way to skip from inside a
+/// test body. See <see cref="RequiresAnafValidatorFactAttribute"/> for why skipping is safe here.
+/// </remarks>
+public sealed class RequiresAnafValidatorTheoryAttribute : TheoryAttribute
+{
+    /// <summary>Marks the theory skipped when the validator cannot be found.</summary>
+    public RequiresAnafValidatorTheoryAttribute()
+    {
+        if (!AnafValidator.IsAvailable)
+        {
+            Skip = $"ANAF validator not available. Set {AnafValidator.HomeVariable} to an unpacked "
+                 + "roefacturavalidator directory to run the oracle comparison.";
+        }
+    }
+}
