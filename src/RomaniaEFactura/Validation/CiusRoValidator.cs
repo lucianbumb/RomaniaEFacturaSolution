@@ -102,13 +102,20 @@ public static class CiusRoValidator
 
     private static void CheckParties(DocumentView doc, List<ValidationFinding> findings)
     {
-        CheckParty(doc.Seller, "Seller", "BR-06", "BR-08", "BR-09", findings);
-        CheckParty(doc.Buyer, "Buyer", "BR-07", "BR-10", "BR-11", findings);
+        CheckParty(doc.Seller, "Seller", "BR-06", "BR-08", "BR-09", "BR-RO-110", "BR-RO-100", findings);
+        CheckParty(doc.Buyer, "Buyer", "BR-07", "BR-10", "BR-11", "BR-RO-111", "BR-RO-101", findings);
+
+        // CIUS-RO requires a street and a city where EN16931 does not. Stated per role, so a
+        // finding names the rule that will actually appear in ANAF's response.
+        CheckAddressLines(doc.Seller.PostalAddress, "Seller", "BR-RO-081", "BR-RO-091", "BT-35", "BT-37", findings);
+        CheckAddressLines(doc.Buyer.PostalAddress, "Buyer", "BR-RO-082", "BR-RO-092", "BT-50", "BT-52", findings);
+
+        CheckTaxRepresentative(doc, findings);
 
         // BR-RO-201/202/211/212 apply the same subdivision and sector rules to where the goods
         // went, which is a separate address and is missed easily because it is optional.
         var deliveryAddress = doc.Delivery?.DeliveryLocation?.Address;
-        CheckRomanianAddress(deliveryAddress, "Delivery", findings);
+        CheckRomanianAddress(deliveryAddress, "Delivery", "BR-RO-212", "BR-RO-202", findings);
 
         // BR-RO-210 goes further than the seller and buyer rules: a delivery address must name a
         // subdivision whatever its country, not only when that country is Romania.
@@ -126,6 +133,8 @@ public static class CiusRoValidator
         string nameRule,
         string addressRule,
         string countryRule,
+        string subdivisionRule,
+        string sectorRule,
         List<ValidationFinding> findings)
     {
         var name = party.PartyLegalEntity?.RegistrationName ?? party.PartyName?.Name;
@@ -145,7 +154,7 @@ public static class CiusRoValidator
                 Path: $"{role}.PostalAddress.Country"));
         }
 
-        CheckRomanianAddress(party.PostalAddress, role, findings);
+        CheckRomanianAddress(party.PostalAddress, role, subdivisionRule, sectorRule, findings);
 
         // Enforced by ANAF outside the Schematron: the party must be identifiable, and a Romanian
         // CIF must carry a correct control digit.
@@ -192,16 +201,89 @@ public static class CiusRoValidator
     }
 
     /// <summary>
+    /// The street and city CIUS-RO insists on, which EN16931 leaves optional.
+    /// </summary>
+    /// <remarks>
+    /// Every party has its own rule id for the same demand — BR-RO-081 for the seller's street,
+    /// BR-RO-082 for the buyer's — so they are passed in rather than shared. Reporting the seller's
+    /// id for the buyer's missing street would send a reader to the wrong line of the Schematron.
+    /// </remarks>
+    private static void CheckAddressLines(
+        PostalAddress? address,
+        string role,
+        string streetRule,
+        string cityRule,
+        string streetTerm,
+        string cityTerm,
+        List<ValidationFinding> findings)
+    {
+        var noun = role.ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(address?.StreetName))
+        {
+            findings.Add(new(streetRule,
+                $"The {noun} address must have a street ({streetTerm}).",
+                Path: $"{role}.PostalAddress.StreetName"));
+        }
+
+        if (string.IsNullOrWhiteSpace(address?.CityName))
+        {
+            findings.Add(new(cityRule,
+                $"The {noun} address must have a city ({cityTerm}).",
+                Path: $"{role}.PostalAddress.CityName"));
+        }
+    }
+
+    /// <summary>
+    /// The seller's tax representative (BG-11), where one is appointed.
+    /// </summary>
+    /// <remarks>
+    /// A company selling into Romania without being established there appoints one, and the
+    /// invoice must name them. CIUS-RO then applies to the representative's address the same four
+    /// demands it makes of the seller's — street, city, a coded county, and the Bucharest sector
+    /// rule — under their own rule ids.
+    /// </remarks>
+    private static void CheckTaxRepresentative(DocumentView doc, List<ValidationFinding> findings)
+    {
+        if (doc.TaxRepresentative is not { } representative) return;
+
+        if (string.IsNullOrWhiteSpace(representative.PartyName?.Name))
+        {
+            findings.Add(new("BR-62",
+                "A tax representative must be named (BT-62).",
+                Path: "TaxRepresentative.PartyName"));
+        }
+
+        // BT-63. The representative exists to be the VAT-liable party, so an unidentified one
+        // defeats the purpose — and BR-RO-065 accepts it in place of the seller's own identifier.
+        if (!representative.PartyTaxSchemes.Any(scheme => !string.IsNullOrWhiteSpace(scheme.CompanyId?.Value)))
+        {
+            findings.Add(new("BR-63",
+                "A tax representative must have a VAT identifier (BT-63).",
+                Path: "TaxRepresentative.PartyTaxScheme"));
+        }
+
+        CheckAddressLines(representative.PostalAddress, "TaxRepresentative",
+            "BR-RO-140", "BR-RO-150", "BT-64", "BT-66", findings);
+
+        CheckRomanianAddress(representative.PostalAddress, "TaxRepresentative", "BR-RO-170", "BR-RO-160", findings);
+    }
+
+    /// <summary>
     /// The subdivision and city rules CIUS-RO adds for Romanian addresses.
     /// </summary>
     /// <remarks>
     /// Shared between the seller, the buyer and the delivery address because the Schematron states
-    /// the same three rules three times over, once per role — BR-RO-090/100/110 for the seller,
-    /// BR-RO-092/101/111 for the buyer, BR-RO-201/202/211/212 for the delivery address.
+    /// the same rules once per role, under different ids: BR-RO-100/110 for the seller,
+    /// BR-RO-101/111 for the buyer, BR-RO-202/212 for the delivery address and BR-RO-160/170 for
+    /// the tax representative. They are passed in rather than shared, because a finding that names
+    /// the seller's rule for the buyer's field sends a reader to the wrong line of the Schematron.
     /// </remarks>
     private static void CheckRomanianAddress(
         PostalAddress? address,
         string role,
+        string subdivisionRule,
+        string sectorRule,
         List<ValidationFinding> findings)
     {
         if (address is null) return;
@@ -213,18 +295,20 @@ public static class CiusRoValidator
         var subdivision = address.CountrySubentity?.Trim();
         var noun = role.ToLowerInvariant();
 
+        // A missing subdivision and a misspelt one fail the same rule: the Schematron asks whether
+        // the value is in the ISO 3166-2:RO list, and an absent value is not.
         if (string.IsNullOrWhiteSpace(subdivision))
         {
-            findings.Add(new("BR-RO-090",
-                $"A Romanian {noun} address must have a county code such as RO-B or RO-CJ (BT-39).",
+            findings.Add(new(subdivisionRule,
+                $"A Romanian {noun} address must have a county code such as RO-B or RO-CJ.",
                 Path: $"{role}.PostalAddress.CountrySubentity"));
             return;
         }
 
         if (!RomanianCounties.IsValid(subdivision))
         {
-            findings.Add(new("BR-RO-110",
-                $"'{subdivision}' is not an ISO 3166-2:RO county code (BT-39). "
+            findings.Add(new(subdivisionRule,
+                $"'{subdivision}' is not an ISO 3166-2:RO county code. "
                 + "ANAF requires a code such as RO-B or RO-CJ, not a county name.",
                 Path: $"{role}.PostalAddress.CountrySubentity"));
             return;
@@ -236,7 +320,7 @@ public static class CiusRoValidator
         if (string.Equals(subdivision, "RO-B", StringComparison.Ordinal)
             && !RomanianCounties.IsBucharestSector(address.CityName))
         {
-            findings.Add(new("BR-RO-100",
+            findings.Add(new(sectorRule,
                 $"A {noun} in Bucharest (RO-B) must state the city as a sector code — "
                 + $"{string.Join(", ", RomanianCounties.BucharestSectors)} — not '{address.CityName}' (BT-37).",
                 Path: $"{role}.PostalAddress.CityName"));

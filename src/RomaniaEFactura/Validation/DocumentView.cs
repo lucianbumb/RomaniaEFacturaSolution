@@ -60,6 +60,9 @@ internal sealed record DocumentView
     /// <summary>Delivery details (BG-13), which carry an address of their own.</summary>
     public Delivery? Delivery { get; init; }
 
+    /// <summary>The seller's tax representative (BG-11), where one is appointed.</summary>
+    public Party? TaxRepresentative { get; init; }
+
     /// <summary>Free-text notes (BT-22), which CIUS-RO caps by both count and length.</summary>
     public required IReadOnlyList<string> Notes { get; init; }
 
@@ -99,6 +102,7 @@ internal sealed record DocumentView
         PaymentTerms = invoice.PaymentTerms,
         InvoicePeriod = invoice.InvoicePeriod,
         Delivery = invoice.Delivery,
+        TaxRepresentative = invoice.TaxRepresentativeParty,
         Notes = invoice.Notes,
         PrecedingDocumentCount = invoice.BillingReferences.Count,
         SupportingDocumentCount = invoice.AdditionalDocumentReferences.Count,
@@ -135,6 +139,7 @@ internal sealed record DocumentView
         PaymentTerms = creditNote.PaymentTerms,
         InvoicePeriod = creditNote.InvoicePeriod,
         Delivery = creditNote.Delivery,
+        TaxRepresentative = creditNote.TaxRepresentativeParty,
         Notes = creditNote.Notes,
         PrecedingDocumentCount = creditNote.BillingReferences.Count,
         SupportingDocumentCount = creditNote.AdditionalDocumentReferences.Count,

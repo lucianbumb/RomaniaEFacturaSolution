@@ -27,6 +27,7 @@ Two tests keep this document from drifting:
 | `BR-RO-120` | The buyer is identifiable by BT-47 or BT-48 |
 | `BR-RO-180` / `201` / `202` / `211` / `212` | A delivery address is complete and correctly coded |
 | `BR-RO-210` | A delivery address states a subdivision **whatever** its country |
+| `BR-RO-140` / `150` / `160` / `170` | The tax representative's address (BG-11) is complete and correctly coded |
 
 ### Amounts and VAT
 
@@ -55,7 +56,7 @@ absence from this library is the reason its rules are not checked — not an ove
 
 | Fields | Rules |
 |---|---|
-| Seller tax representative (BG-11) | `BR-RO-140`, `150`, `160`, `170`, `L0203`, `L0503`, `L153`, `L1012`, `L1013`, `L206` |
+| Tax representative address line 3 (BT-164) | `BR-RO-L1013` |
 | Item attributes (BG-32) | `BR-RO-A052`, `L0505`, `L1025` |
 | Document attachments (BT-124, BT-125) | `BR-RO-L210`, `L211` |
 | Card payment (BT-88) | `BR-RO-L209` |
@@ -75,5 +76,11 @@ absence from this library is the reason its rules are not checked — not an ove
 
 The code ANAF prints is not always the rule id. All three 300-character rules — `BR-RO-L301`,
 `L302`, `L303` — report as `[BR-RO-L300]`, which is not the id of any rule; `BR-RO-092` reports as
-`[BR-RO-090]`. Findings from this library use the **rule id**, so a code from here can be found in
-the Schematron and a code from ANAF's validator sometimes cannot.
+`[BR-RO-090]`, which is not one either. Findings from this library use the **rule id**, so a code
+from here can be found in the Schematron and a code from ANAF's validator sometimes cannot.
+
+This matters more than it looks. The library reported `BR-RO-090` for a missing county from M2
+until the tax representative work, because that is the code ANAF prints — and a consumer branching
+on it was branching on something that does not exist. Findings now carry `BR-RO-110` for the
+seller, `111` for the buyer, `170` for the representative and `212` for the delivery address: the
+same rule, four ids, each looked up where it is actually written.

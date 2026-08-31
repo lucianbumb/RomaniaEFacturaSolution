@@ -38,6 +38,11 @@ public partial class CiusRoLengthTableTests
             { "BR-RO-L0308", CiusRoLengths.ObjectIdentifier },
             { "BR-RO-L1020", CiusRoLengths.SupportingDocumentDescription },
             { "BR-RO-L201", CiusRoLengths.PartyName },
+            { "BR-RO-L153", CiusRoLengths.AddressLine1 },
+            { "BR-RO-L1012", CiusRoLengths.AddressLine2 },
+            { "BR-RO-L0503", CiusRoLengths.City },
+            { "BR-RO-L0203", CiusRoLengths.PostalCode },
+            { "BR-RO-L206", CiusRoLengths.PartyName },
             { "BR-RO-L202", CiusRoLengths.TradingName },
             { "BR-RO-L1000", CiusRoLengths.CompanyLegalForm },
             { "BR-RO-L205", CiusRoLengths.PayeeName },
@@ -97,11 +102,11 @@ public partial class CiusRoLengthTableTests
     /// </remarks>
     private static readonly (int Ours, string[] Rules)[] SharedLimits =
     [
-        (CiusRoLengths.City, ["BR-RO-L0501", "BR-RO-L0502", "BR-RO-L0504"]),
-        (CiusRoLengths.PostalCode, ["BR-RO-L0201", "BR-RO-L0202", "BR-RO-L0204"]),
-        (CiusRoLengths.AddressLine1, ["BR-RO-L151", "BR-RO-L152", "BR-RO-L154"]),
-        (CiusRoLengths.AddressLine2, ["BR-RO-L1002", "BR-RO-L1007", "BR-RO-L1014"]),
-        (CiusRoLengths.PartyName, ["BR-RO-L201", "BR-RO-L203"]),
+        (CiusRoLengths.City, ["BR-RO-L0501", "BR-RO-L0502", "BR-RO-L0503", "BR-RO-L0504"]),
+        (CiusRoLengths.PostalCode, ["BR-RO-L0201", "BR-RO-L0202", "BR-RO-L0203", "BR-RO-L0204"]),
+        (CiusRoLengths.AddressLine1, ["BR-RO-L151", "BR-RO-L152", "BR-RO-L153", "BR-RO-L154"]),
+        (CiusRoLengths.AddressLine2, ["BR-RO-L1002", "BR-RO-L1007", "BR-RO-L1012", "BR-RO-L1014"]),
+        (CiusRoLengths.PartyName, ["BR-RO-L201", "BR-RO-L203", "BR-RO-L206"]),
         (CiusRoLengths.TradingName, ["BR-RO-L202", "BR-RO-L204"]),
         (CiusRoLengths.ContactName, ["BR-RO-L1004", "BR-RO-L1009"]),
         (CiusRoLengths.ContactTelephone, ["BR-RO-L1005", "BR-RO-L1010"]),
@@ -135,12 +140,7 @@ public partial class CiusRoLengthTableTests
         // Deliberately not enforced, because the library cannot express the fields they cap.
         var unrepresentable = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BR-RO-L0203"] = "tax representative post code (BT-67) — BG-11 is not modelled",
-            ["BR-RO-L0503"] = "tax representative city (BT-66) — BG-11 is not modelled",
-            ["BR-RO-L153"] = "tax representative address line 1 (BT-64) — BG-11 is not modelled",
-            ["BR-RO-L1012"] = "tax representative address line 2 (BT-65) — BG-11 is not modelled",
             ["BR-RO-L1013"] = "tax representative address line 3 (BT-164) — BG-11 is not modelled",
-            ["BR-RO-L206"] = "tax representative name (BT-62) — BG-11 is not modelled",
             ["BR-RO-L207"] = "deliver-to party name (BT-70) — the delivery party name is not modelled",
             ["BR-RO-L209"] = "payment card holder name (BT-88) — card payment is not modelled",
             ["BR-RO-L210"] = "external document location (BT-124) — attachments are not modelled",
