@@ -143,7 +143,9 @@ public class CiusRoValidatorTests
 
         var report = CiusRoValidator.Validate(invoice);
 
-        Assert.Contains("BR-RO-090", report.ErrorCodes);
+        // BR-RO-110, not BR-RO-090: the latter is what ANAF's message text prints but is not the
+        // id of any rule, so a finding carrying it could not be looked up.
+        Assert.Contains("BR-RO-110", report.ErrorCodes);
     }
 
     [Fact]

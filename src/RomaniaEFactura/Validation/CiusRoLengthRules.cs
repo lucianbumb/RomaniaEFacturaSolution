@@ -66,6 +66,22 @@ internal static class CiusRoLengthRules
                 $"Note {index + 1} (BT-22)", $"Notes[{index}]");
         }
 
+        if (doc.TaxRepresentative is { } representative)
+        {
+            yield return ("BR-RO-L206", CiusRoLengths.PartyName, representative.PartyName?.Name,
+                "The tax representative's name (BT-62)", "TaxRepresentative.PartyName");
+
+            var address = representative.PostalAddress;
+            yield return ("BR-RO-L153", CiusRoLengths.AddressLine1, address?.StreetName,
+                "The tax representative's street (BT-64)", "TaxRepresentative.PostalAddress.StreetName");
+            yield return ("BR-RO-L1012", CiusRoLengths.AddressLine2, address?.AdditionalStreetName,
+                "The tax representative's address line 2 (BT-65)", "TaxRepresentative.PostalAddress.AdditionalStreetName");
+            yield return ("BR-RO-L0503", CiusRoLengths.City, address?.CityName,
+                "The tax representative's city (BT-66)", "TaxRepresentative.PostalAddress.CityName");
+            yield return ("BR-RO-L0203", CiusRoLengths.PostalCode, address?.PostalZone,
+                "The tax representative's post code (BT-67)", "TaxRepresentative.PostalAddress.PostalZone");
+        }
+
         // The delivery address, which the seller and buyer loop above does not reach.
         var delivery = doc.Delivery?.DeliveryLocation?.Address;
         if (delivery is not null)

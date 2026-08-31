@@ -99,6 +99,18 @@ public sealed class UblInvoice
     [XmlElement("AccountingCustomerParty", Namespace = UblNamespaces.Cac)]
     public PartyWrapper AccountingCustomerParty { get; set; } = new();
 
+    /// <summary>
+    /// The seller's tax representative (BG-11).
+    /// </summary>
+    /// <remarks>
+    /// A company selling into Romania without being established there appoints a fiscal
+    /// representative, and the invoice must name them. CIUS-RO adds four rules of its own for the
+    /// representative's address — BR-RO-140, 150, 160 and 170 — which are the same demands it makes
+    /// of the seller and buyer addresses, including the Bucharest sector rule.
+    /// </remarks>
+    [XmlElement("TaxRepresentativeParty", Namespace = UblNamespaces.Cac)]
+    public Party? TaxRepresentativeParty { get; set; }
+
     /// <summary>Delivery information (BG-13).</summary>
     [XmlElement("Delivery", Namespace = UblNamespaces.Cac)]
     public Delivery? Delivery { get; set; }

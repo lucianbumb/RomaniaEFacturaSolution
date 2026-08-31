@@ -56,6 +56,14 @@ public abstract class DocumentEditModel : IValidatableObject
     [Required]
     public PartyEditModel Buyer { get; set; } = new();
 
+    /// <summary>
+    /// The seller's fiscal representative in Romania (BG-11), where one is appointed.
+    /// </summary>
+    /// <remarks>
+    /// Needed when the seller is not established in Romania. Leaving it null is the ordinary case.
+    /// </remarks>
+    public TaxRepresentativeEditModel? TaxRepresentative { get; set; }
+
     /// <summary>The document lines (BG-25). At least one is required by BR-16.</summary>
     public List<DocumentLineEditModel> Lines { get; set; } = [];
 
@@ -290,6 +298,16 @@ public abstract class DocumentEditModel : IValidatableObject
         foreach (var result in ValidateCounty(Buyer.Address, $"{nameof(Buyer)}.{nameof(PartyEditModel.Address)}"))
         {
             yield return result;
+        }
+
+        if (TaxRepresentative is not null)
+        {
+            foreach (var result in ValidateCounty(
+                         TaxRepresentative.Address,
+                         $"{nameof(TaxRepresentative)}.{nameof(TaxRepresentativeEditModel.Address)}"))
+            {
+                yield return result;
+            }
         }
 
         if (DeliveryAddress is not null)

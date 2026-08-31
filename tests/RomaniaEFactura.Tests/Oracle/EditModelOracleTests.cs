@@ -33,6 +33,9 @@ public class EditModelOracleTests
         "document-discount-and-charge",
         "fractional-unit-price",
         "price-base-quantity",
+        // BG-11: a foreign seller invoicing through a Romanian fiscal representative.
+        "tax-representative",
+        "tax-representative-in-bucharest",
     ];
 
     [RequiresAnafValidatorTheory]
@@ -89,6 +92,20 @@ public class EditModelOracleTests
 
         Assert.True(theirs.IsValid, $"ANAF's validator rejected the credit note: {theirs}");
     }
+
+    private static TaxRepresentativeEditModel Representative(string city, string county) => new()
+    {
+        Name = "Reprezentant Fiscal SRL",
+        VatNumber = "RO12345674",
+        Address = new AddressEditModel
+        {
+            Street = "Strada Reprezentantului 3",
+            City = city,
+            County = county,
+            PostalCode = "400002",
+            CountryCode = "RO",
+        },
+    };
 
     private static InvoiceEditModel Build(string scenario)
     {
@@ -174,6 +191,21 @@ public class EditModelOracleTests
                 var invoice = SampleEditModels.MinimalInvoice();
                 invoice.Lines[0].Quantity = 7m;
                 invoice.Lines[0].UnitPrice = 12.3456m;
+                return invoice;
+            }
+
+            case "tax-representative":
+            {
+                var invoice = SampleEditModels.MinimalInvoice();
+                invoice.TaxRepresentative = Representative("Cluj-Napoca", "RO-CJ");
+                return invoice;
+            }
+
+            case "tax-representative-in-bucharest":
+            {
+                // The sector rule applies to this address too, under BR-RO-160.
+                var invoice = SampleEditModels.MinimalInvoice();
+                invoice.TaxRepresentative = Representative("SECTOR3", "RO-B");
                 return invoice;
             }
 

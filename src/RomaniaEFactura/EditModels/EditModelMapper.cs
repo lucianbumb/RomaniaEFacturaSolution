@@ -35,6 +35,7 @@ public static class EditModelMapper
             BillingReferences = MapPrecedingDocuments(model),
             AccountingSupplierParty = new PartyWrapper(MapParty(model.Seller)),
             AccountingCustomerParty = new PartyWrapper(MapParty(model.Buyer)),
+            TaxRepresentativeParty = MapTaxRepresentative(model),
             Delivery = MapDelivery(model),
             PaymentMeans = MapPaymentMeans(model),
             PaymentTerms = MapPaymentTerms(model),
@@ -84,6 +85,7 @@ public static class EditModelMapper
             BillingReferences = MapPrecedingDocuments(model),
             AccountingSupplierParty = new PartyWrapper(MapParty(model.Seller)),
             AccountingCustomerParty = new PartyWrapper(MapParty(model.Buyer)),
+            TaxRepresentativeParty = MapTaxRepresentative(model),
             Delivery = MapDelivery(model),
             PaymentMeans = MapPaymentMeans(model),
             PaymentTerms = MapPaymentTerms(model),
@@ -341,6 +343,24 @@ public static class EditModelMapper
             },
         })
     ];
+
+    private static Party? MapTaxRepresentative(DocumentEditModel model)
+    {
+        if (model.TaxRepresentative is not { } representative) return null;
+
+        // Name and VAT identifier only. A representative has no BT-30 of its own, so unlike a
+        // seller or buyer it gets no PartyLegalEntity — writing one would be schema-valid and
+        // meaningless.
+        var party = new Party
+        {
+            PartyName = new PartyName { Name = representative.Name },
+            PostalAddress = MapAddress(representative.Address),
+        };
+
+        party.PartyTaxSchemes.Add(new PartyTaxScheme { CompanyId = representative.VatNumber });
+
+        return party;
+    }
 
     private static Delivery? MapDelivery(DocumentEditModel model)
     {
