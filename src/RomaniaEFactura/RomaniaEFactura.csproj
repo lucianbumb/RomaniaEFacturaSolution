@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -34,6 +34,18 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- The envelope reader is internal because nothing outside the transport should be deciding
+       whether an ANAF response succeeded, but it needs testing directly against real bodies. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="RomaniaEFactura.Tests" />
+    <InternalsVisibleTo Include="RomaniaEFactura.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
   </ItemGroup>
 
 </Project>
