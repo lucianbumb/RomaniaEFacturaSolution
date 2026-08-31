@@ -18,10 +18,10 @@ can fail at runtime (nobody has authorized this CIF yet, the token expired, ANAF
 limited, no SPV rights) comes back as a typed result you branch on, not an exception you discover
 in production.
 
-The guarantee is stated for the edit models deliberately. `Verify(UblInvoice)` — the path for
-callers who build UBL directly — runs the same engine, but a UBL document can express things the
-edit models cannot, and the rule port is not yet complete for those
-([#18](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/18)).
+`Verify(UblInvoice)` — the path for callers who build UBL directly — runs the same engine and the
+same CIUS-RO limits. What it cannot check is a field the library does not model: a tax
+representative (BG-11), item attributes (BG-32) and document attachments have no representation, so
+nothing validates them. Those exclusions are enumerated and tested rather than left implicit.
 
 ## Intended usage
 

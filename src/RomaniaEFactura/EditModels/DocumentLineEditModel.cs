@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using RomaniaEFactura.Validation;
 
 namespace RomaniaEFactura.EditModels;
 
@@ -26,12 +27,12 @@ public sealed class DocumentLineEditModel : IValidatableObject
 
     /// <summary>What is being sold (BT-153).</summary>
     [Required(ErrorMessage = "The item name is required.")]
-    [StringLength(200, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.ItemName, MinimumLength = 1)]
     [Display(Name = "Item")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>A longer description of the item (BT-154).</summary>
-    [StringLength(1000)]
+    [StringLength(CiusRoLengths.ItemDescription)]
     [Display(Name = "Description")]
     public string? Description { get; set; }
 
@@ -104,7 +105,7 @@ public sealed class DocumentLineEditModel : IValidatableObject
     public decimal? DiscountAmount { get; set; }
 
     /// <summary>Why the discount is given (BT-104).</summary>
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.LineAdjustmentReason)]
     [Display(Name = "Discount reason")]
     public string? DiscountReason { get; set; }
 
@@ -114,7 +115,7 @@ public sealed class DocumentLineEditModel : IValidatableObject
     public decimal? ChargeAmount { get; set; }
 
     /// <summary>Why the charge is made (BT-105).</summary>
-    [StringLength(200)]
+    [StringLength(CiusRoLengths.LineAdjustmentReason)]
     [Display(Name = "Charge reason")]
     public string? ChargeReason { get; set; }
 
@@ -127,7 +128,7 @@ public sealed class DocumentLineEditModel : IValidatableObject
     /// which is the only place EN16931 permits it: rules UBL-CR-598 to UBL-CR-604 forbid it on the
     /// line, and ANAF rejects a document that states it in both places.
     /// </remarks>
-    [StringLength(500)]
+    [StringLength(CiusRoLengths.VatExemptionReason)]
     [Display(Name = "VAT exemption reason")]
     public string? VatExemptionReason { get; set; }
 
@@ -137,12 +138,12 @@ public sealed class DocumentLineEditModel : IValidatableObject
     public string? VatExemptionReasonCode { get; set; }
 
     /// <summary>A free-text note for this line (BT-127).</summary>
-    [StringLength(1000)]
+    [StringLength(CiusRoLengths.LineNote)]
     [Display(Name = "Note")]
     public string? Note { get; set; }
 
     /// <summary>Buyer's accounting reference for this line (BT-133).</summary>
-    [StringLength(100)]
+    [StringLength(CiusRoLengths.LineAccountingReference)]
     [Display(Name = "Cost centre")]
     public string? AccountingReference { get; set; }
 

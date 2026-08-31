@@ -40,6 +40,22 @@ public class OracleAgreementTests
         "vat-id-without-country-prefix",
         "period-end-before-start",
         "unknown-vat-category",
+        // The CIUS-RO caps. Each is a rule the library enforces and had not proved ANAF agrees on
+        // — and each names a limit the first version of the edit models got wrong.
+        "item-name-too-long",
+        "item-description-too-long",
+        "seller-city-too-long",
+        "buyer-city-too-long",
+        "payment-terms-too-long",
+        "note-too-long",
+        "too-many-notes",
+        "line-note-too-long",
+        "document-number-without-a-digit",
+        // The other direction: values at or near a cap that ANAF must still accept, so the
+        // library's limits cannot quietly become stricter than the specification.
+        "long-but-legal-document-number",
+        "item-name-at-the-limit",
+        "note-at-the-limit",
     ];
 
     [RequiresAnafValidatorTheory]
@@ -125,6 +141,62 @@ public class OracleAgreementTests
 
             case "negative-unit-price":
                 invoice.InvoiceLines[0].Price.PriceAmount = new Amount(-100.00m);
+                break;
+
+            case "item-name-too-long":
+                invoice.InvoiceLines[0].Item.Name = new string('x', CiusRoLengths.ItemName + 1);
+                break;
+
+            case "item-description-too-long":
+                invoice.InvoiceLines[0].Item.Description =
+                    new string('x', CiusRoLengths.ItemDescription + 1);
+                break;
+
+            case "seller-city-too-long":
+                invoice.AccountingSupplierParty.Party.PostalAddress!.CountrySubentity = "RO-CJ";
+                invoice.AccountingSupplierParty.Party.PostalAddress.CityName =
+                    new string('c', CiusRoLengths.City + 1);
+                break;
+
+            case "buyer-city-too-long":
+                invoice.AccountingCustomerParty.Party.PostalAddress!.CityName =
+                    new string('c', CiusRoLengths.City + 1);
+                break;
+
+            case "payment-terms-too-long":
+                invoice.PaymentTerms = new PaymentTerms
+                {
+                    Note = new string('t', CiusRoLengths.PaymentTerms + 1),
+                };
+                break;
+
+            case "note-too-long":
+                invoice.Notes = [new string('n', CiusRoLengths.Note + 1)];
+                break;
+
+            case "too-many-notes":
+                invoice.Notes =
+                    [.. Enumerable.Range(0, CiusRoLengths.MaxNotes + 1).Select(i => $"note {i}")];
+                break;
+
+            case "line-note-too-long":
+                invoice.InvoiceLines[0].Note = new string('n', CiusRoLengths.LineNote + 1);
+                break;
+
+            case "document-number-without-a-digit":
+                invoice.Id = "FACTURA-SERIE-A";
+                break;
+
+            case "long-but-legal-document-number":
+                invoice.Id = "FCT-2026-" + new string('N', CiusRoLengths.DocumentNumber - 9);
+                break;
+
+            case "item-name-at-the-limit":
+                invoice.InvoiceLines[0].Item.Name = new string('x', CiusRoLengths.ItemName);
+                break;
+
+            case "note-at-the-limit":
+                invoice.Notes = [new string('n', CiusRoLengths.Note)];
                 break;
 
             case "reverse-charge-valid":

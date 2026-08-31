@@ -296,8 +296,35 @@ found by running generated documents through `ROeFacturaValidator.jar`, not by r
 | BR-IC-11 / 12 | An intra-community supply must state the delivery date or the invoicing period, **and** the delivery country. |
 | BR-RO-A020 / A051 / A052 / A500 | Caps on repeating groups: 20 notes, 50 supporting documents, 50 item attributes, 500 preceding references. |
 
-The Schematron defines 97 `BR-RO-*` rules in total. What the library implements, and what it does
-not, is tracked as its own issue.
+### Length caps
+
+Romania caps roughly sixty fields EN16931 leaves unbounded, in the `BR-RO-L*` family, plus four
+repeating groups in `BR-RO-A*`. They are unremarkable individually and dangerous collectively,
+because the numbers are not guessable:
+
+| Field | Cap |
+|---|---|
+| Item name (BT-153) | **100** — not 200, which is the item *description* |
+| City (BT-37/52/77) | **50** |
+| VAT exemption reason (BT-120) | **100** |
+| Allowance and charge reasons (BT-97/104/139/144) | **100** |
+| Contact name, telephone, email (BT-41/42/43) | **100** each |
+| Address line 2 (BT-36/51/76) | **100**, where line 1 is 150 |
+| Payment terms (BT-20), notes (BT-22), line notes (BT-127) | **300** |
+| Invoice number (BT-1), preceding invoice number (BT-25) | **200** |
+| Notes per document | **20** |
+
+`CiusRoLengths` holds the full table, and a test parses this Schematron and asserts every constant
+against it — so the table is checked against ANAF's own file rather than hand-copied and trusted.
+
+**The reported code is not always the rule id.** All three 300-character rules — payment terms
+(`BR-RO-L301`), invoice note (`BR-RO-L302`) and line note (`BR-RO-L303`) — print `[BR-RO-L300]` in
+their message text, and `BR-RO-L300` is not the id of any rule. Anything matching on the code ANAF
+reports rather than on the rule it fired will look for a rule that does not exist. The same is true
+of `BR-RO-090`, whose buyer counterpart `BR-RO-092` also prints `[BR-RO-090]`.
+
+The Schematron defines 97 `BR-RO-*` rules in total. What the library implements, and what it
+cannot express, is tracked in issue #18.
 
 ### What the offline validator cannot check
 

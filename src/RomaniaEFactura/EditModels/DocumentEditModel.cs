@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using RomaniaEFactura.Validation;
 
 namespace RomaniaEFactura.EditModels;
 
@@ -23,7 +24,7 @@ public abstract class DocumentEditModel : IValidatableObject
 {
     /// <summary>Document number (BT-1). Must be unique for the seller.</summary>
     [Required(ErrorMessage = "The document number is required.")]
-    [StringLength(50, MinimumLength = 1)]
+    [StringLength(CiusRoLengths.DocumentNumber, MinimumLength = 1)]
     [Display(Name = "Number")]
     public string Number { get; set; } = string.Empty;
 
@@ -71,17 +72,16 @@ public abstract class DocumentEditModel : IValidatableObject
     /// Public-sector buyers routinely require it and reject invoices without one, though EN16931
     /// itself does not.
     /// </remarks>
-    [StringLength(100)]
     [Display(Name = "Buyer reference")]
     public string? BuyerReference { get; set; }
 
     /// <summary>Purchase order number (BT-13).</summary>
-    [StringLength(100)]
+    [StringLength(CiusRoLengths.OrderReference)]
     [Display(Name = "Purchase order")]
     public string? OrderReference { get; set; }
 
     /// <summary>Buyer's accounting reference for the document (BT-19).</summary>
-    [StringLength(100)]
+    [StringLength(CiusRoLengths.AccountingReference)]
     [Display(Name = "Cost centre")]
     public string? AccountingReference { get; set; }
 
@@ -107,7 +107,7 @@ public abstract class DocumentEditModel : IValidatableObject
     public PaymentEditModel? Payment { get; set; }
 
     /// <summary>Payment terms in words (BT-20).</summary>
-    [StringLength(500)]
+    [StringLength(CiusRoLengths.PaymentTerms)]
     [Display(Name = "Payment terms")]
     public string? PaymentTerms { get; set; }
 
@@ -127,7 +127,7 @@ public abstract class DocumentEditModel : IValidatableObject
     /// charge. A line's own <see cref="DocumentLineEditModel.VatExemptionReason"/> takes
     /// precedence, which is what makes a mixed document expressible.
     /// </remarks>
-    [StringLength(500)]
+    [StringLength(CiusRoLengths.VatExemptionReason)]
     [Display(Name = "VAT exemption reason")]
     public string? VatExemptionReason { get; set; }
 
@@ -255,18 +255,30 @@ public abstract class DocumentEditModel : IValidatableObject
         }
 
         // BR-RO-A020 and BR-RO-A500 cap two repeating groups ANAF would otherwise refuse silently.
-        if (Notes.Count > 20)
+        if (Notes.Count > CiusRoLengths.MaxNotes)
         {
             yield return new ValidationResult(
-                $"A document may carry at most 20 notes (BR-RO-A020); this one has {Notes.Count}.",
+                $"A document may carry at most {CiusRoLengths.MaxNotes} notes (BR-RO-A020); "
+                + $"this one has {Notes.Count}.",
                 [nameof(Notes)]);
         }
 
-        if (PrecedingDocuments.Count > 500)
+        // BR-RO-L302. The notes are a plain string list, so no attribute can reach them — the
+        // only place their length can be checked is here.
+        var overlongNote = Notes.FindIndex(note => note is { Length: > CiusRoLengths.Note });
+        if (overlongNote >= 0)
         {
             yield return new ValidationResult(
-                "A document may reference at most 500 preceding documents (BR-RO-A500); "
-                + $"this one references {PrecedingDocuments.Count}.",
+                $"Note {overlongNote + 1} is {Notes[overlongNote].Length} characters; "
+                + $"CIUS-RO allows {CiusRoLengths.Note} (BR-RO-L302).",
+                [nameof(Notes)]);
+        }
+
+        if (PrecedingDocuments.Count > CiusRoLengths.MaxPrecedingDocuments)
+        {
+            yield return new ValidationResult(
+                $"A document may reference at most {CiusRoLengths.MaxPrecedingDocuments} preceding "
+                + $"documents (BR-RO-A500); this one references {PrecedingDocuments.Count}.",
                 [nameof(PrecedingDocuments)]);
         }
 
