@@ -84,6 +84,29 @@ object and stops, and Blazor's `DataAnnotationsValidator` does the same — neit
 `Lines`. ASP.NET Core MVC's model binder does recurse, which makes the gap easy to miss until a
 Blazor page hits it. Calling `Verify` covers it either way.
 
+### In a Blazor form
+
+Use `<EFacturaValidator />` in place of `<DataAnnotationsValidator />`:
+
+```razor
+<EditForm Model="invoice" OnValidSubmit="SendAsync">
+    <EFacturaValidator />
+    <ValidationSummary />
+
+    <InputText @bind-Value="invoice.Lines[0].Name" />
+    <ValidationMessage For="() => invoice.Lines[0].Name" />
+</EditForm>
+```
+
+It runs the same two-stage check the service does and attaches each finding to the field that
+caused it, walking a path such as `Lines[2].UnitCode` back to the line object the input is bound
+to. The built-in validator would leave that line unchecked entirely, so a form using it enables its
+send button on documents ANAF rejects.
+
+Validation runs on every field change rather than only on the changed field, because almost every
+rule here is a cross-field one — a total against its lines, an exemption reason against a VAT
+category — and validating one field in isolation leaves stale messages on the fields it affects.
+
 ## Limits
 
 - **RON only.** BR-RO-030 requires a foreign-currency document to state its VAT in RON as well

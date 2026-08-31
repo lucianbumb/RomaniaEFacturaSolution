@@ -4,6 +4,12 @@
     <ProjectReference Include="..\..\src\RomaniaEFactura\RomaniaEFactura.csproj" />
   </ItemGroup>
 
+  <!-- The library ships EF Core but not a provider: which database to use is the application's
+       choice. SQLite keeps the sample to a single file. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

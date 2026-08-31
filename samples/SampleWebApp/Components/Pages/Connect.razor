@@ -1,0 +1,106 @@
+@page "/connect"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject NavigationManager Navigation
+
+<PageTitle>Connect to ANAF</PageTitle>
+
+<h1>Connection</h1>
+
+<p class="text-secondary">
+    Authorization needs a person with a qualified digital certificate. There is no headless
+    alternative, so &ldquo;nobody has authorized this company yet&rdquo; is a state the interface
+    has to show rather than an error to discover halfway through a send.
+</p>
+
+<div class="mb-3" style="max-width: 22rem;">
+    <label class="form-label" for="cif">Company fiscal code (CIF)</label>
+    <input id="cif" class="form-control" @bind="_cif" @bind:event="oninput" />
+</div>
+
+<button class="btn btn-outline-secondary mb-4" @onclick="RefreshAsync" disabled="@_busy">
+    Check status
+</button>
+
+@if (_status is null)
+{
+    <p><em>Checking&hellip;</em></p>
+}
+else if (!_status.IsConnected)
+{
+    <div class="alert alert-warning">
+        <h5 class="alert-heading">Not authorized</h5>
+        <p>
+            No usable authorization is stored for CIF <strong>@_status.Cif</strong>. Nothing can be
+            sent or downloaded for this company until someone authorizes it.
+        </p>
+        <a class="btn btn-primary" href="@ConnectUrl()">Authorize with ANAF</a>
+    </div>
+
+    <p class="text-secondary small">
+        That link goes to <code>@EFactura.BuildAuthorizationUrl(_status.Cif, "/connect")</code>,
+        built by the library so the signed <code>state</code> parameter is right. Against the mock
+        server it completes immediately; against ANAF it asks for a certificate.
+    </p>
+}
+else
+{
+    <div class="alert alert-success">
+        <h5 class="alert-heading">Connected</h5>
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Company</dt>
+            <dd class="col-sm-8">@_status.Cif</dd>
+
+            <dt class="col-sm-4">Authorized since</dt>
+            <dd class="col-sm-8">@Format(_status.ConnectedSince)</dd>
+
+            <dt class="col-sm-4">Access token expires</dt>
+            <dd class="col-sm-8">
+                @Format(_status.AccessTokenExpiresAt)
+                <span class="text-secondary small">— refreshed silently when it lapses</span>
+            </dd>
+        </dl>
+    </div>
+
+    <button class="btn btn-outline-danger" @onclick="DisconnectAsync" disabled="@_busy">
+        Disconnect
+    </button>
+    <p class="text-secondary small mt-2">
+        Removes the stored authorization. Reconnecting needs the certificate again.
+    </p>
+}
+
+@code {
+    private string _cif = string.Empty;
+    private AuthorizationStatus? _status;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        // Passing null uses the CIF from configuration, which is what a single-company
+        // application does; the box above is here to show the per-call override.
+        _status = await EFactura.GetAuthorizationStatusAsync(NullIfBlank(_cif));
+        _cif = _status.Cif;
+        _busy = false;
+    }
+
+    private async Task DisconnectAsync()
+    {
+        _busy = true;
+        await EFactura.DisconnectAsync(NullIfBlank(_cif));
+        _busy = false;
+        await RefreshAsync();
+    }
+
+    private string ConnectUrl() =>
+        $"/efactura/connect/{_status!.Cif}?returnUrl={Uri.EscapeDataString("/connect")}";
+
+    private static string Format(DateTimeOffset? value) =>
+        value?.LocalDateTime.ToString("g") ?? "—";
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+}

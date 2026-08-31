@@ -1,0 +1,73 @@
+@* A seller or buyer. Extracted because both are the same fields, and because the county
+   dropdown is where the Bucharest rule becomes visible to whoever is filling the form. *@
+
+<h2 class="h5 mt-4">@Title</h2>
+
+<div class="row g-2">
+    <div class="col-md-6">
+        <label class="form-label">Registered name</label>
+        <InputText class="form-control" @bind-Value="Party.Name" />
+        <ValidationMessage For="() => Party.Name" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">CIF</label>
+        <InputText class="form-control" @bind-Value="Party.TaxId" />
+        <ValidationMessage For="() => Party.TaxId" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">VAT number</label>
+        <InputText class="form-control" @bind-Value="Party.VatNumber" />
+        <ValidationMessage For="() => Party.VatNumber" />
+    </div>
+</div>
+
+<div class="row g-2 mt-1">
+    <div class="col-md-5">
+        <label class="form-label">Street</label>
+        <InputText class="form-control" @bind-Value="Party.Address.Street" />
+        <ValidationMessage For="() => Party.Address.Street" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">County</label>
+        <InputSelect class="form-select" @bind-Value="Party.Address.County">
+            <option value="">—</option>
+            @* "code" is a reserved Razor directive name, hence the longer identifiers. *@
+            @foreach (var county in RomanianCounties.All)
+            {
+                <option value="@county.Key">@county.Value (@county.Key)</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="() => Party.Address.County" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">City</label>
+        @if (Party.Address.IsBucharest)
+        {
+            @* BR-RO-100: a Bucharest address states a sector code, never "Bucuresti". A free-text
+               box here is the single most likely way to have an otherwise perfect invoice
+               rejected, so the field becomes a list as soon as the county is RO-B. *@
+            <InputSelect class="form-select" @bind-Value="Party.Address.City">
+                <option value="">—</option>
+                @foreach (var sector in RomanianCounties.BucharestSectors)
+                {
+                    <option value="@sector">@sector</option>
+                }
+            </InputSelect>
+        }
+        else
+        {
+            <InputText class="form-control" @bind-Value="Party.Address.City" />
+        }
+        <ValidationMessage For="() => Party.Address.City" />
+    </div>
+</div>
+
+@code {
+    /// <summary>Heading for this party — "Seller" or "Buyer".</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>The party being edited.</summary>
+    [Parameter, EditorRequired]
+    public PartyEditModel Party { get; set; } = new();
+}

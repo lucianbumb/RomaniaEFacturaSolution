@@ -1,0 +1,58 @@
+@page "/submissions/{UploadIndex}"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject IJSRuntime Js
+
+<PageTitle>Submission @UploadIndex</PageTitle>
+
+<h1>Submission <code>@UploadIndex</code></h1>
+
+@if (_submission is null)
+{
+    <p><em>Loading&hellip;</em></p>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-3">Document</dt>
+        <dd class="col-sm-9">@(_submission.DocumentId ?? "—")</dd>
+
+        <dt class="col-sm-3">State</dt>
+        <dd class="col-sm-9">@_submission.State</dd>
+
+        <dt class="col-sm-3">Sent</dt>
+        <dd class="col-sm-9">@_submission.SubmittedAt.LocalDateTime.ToString("G")</dd>
+
+        <dt class="col-sm-3">Settled</dt>
+        <dd class="col-sm-9">@(_submission.ResolvedAt?.LocalDateTime.ToString("G") ?? "not yet")</dd>
+    </dl>
+
+    @if (_submission.IsPending)
+    {
+        <div class="alert alert-secondary">
+            ANAF is still deciding. This takes minutes to hours, so nothing here waits on it — the
+            reconciler asks on a widening schedule and this page reflects what it has learned.
+            Next check at @_submission.NextPollAt.LocalDateTime.ToString("T").
+        </div>
+    }
+
+    @if (_submission.HasArchive)
+    {
+        <p class="text-secondary">
+            The signed archive is stored locally. It holds the ministry's seal, which is the proof
+            of submission, so it is kept rather than re-fetched — the download allowance is about
+            ten calls a day per identifier.
+        </p>
+    }
+}
+
+@code {
+    /// <summary>ANAF's handle on the submission.</summary>
+    [Parameter]
+    public string UploadIndex { get; set; } = string.Empty;
+
+    private SubmissionStatus? _submission;
+
+    protected override async Task OnParametersSetAsync() =>
+        _submission = await EFactura.GetSubmissionAsync(UploadIndex);
+}

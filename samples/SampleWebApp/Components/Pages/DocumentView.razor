@@ -1,0 +1,104 @@
+@page "/documents/{DownloadId}"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject IJSRuntime Js
+
+<PageTitle>Document @DownloadId</PageTitle>
+
+<h1>Document <code>@DownloadId</code></h1>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">
+        @_error.Message
+        <div class="small text-secondary mt-1">
+            Kind <code>@_error.Kind</code>. Note that ANAF reports this inside an HTTP 200 — the
+            library content-sniffs rather than trusting the status code, which is why you are
+            reading the real reason rather than a ZIP parsing failure.
+        </div>
+    </div>
+}
+else if (_document is null)
+{
+    <p><em>Loading&hellip;</em></p>
+}
+else
+{
+    <p>
+        <span class="badge text-bg-primary">@_document.Kind</span>
+        @if (_document.SignatureXml is not null)
+        {
+            <span class="badge text-bg-secondary">carries the ministry's seal</span>
+        }
+    </p>
+
+    <p class="text-secondary">
+        The archive behind a message is frequently not an invoice — it may be a credit note, a
+        debit note, a validation error report or a buyer message — so the result is discriminated
+        rather than assumed.
+    </p>
+
+    <div class="mb-3">
+        <button class="btn btn-outline-secondary" @onclick="DownloadArchiveAsync" disabled="@_busy">
+            Download the raw archive
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="RenderPdfAsync" disabled="@_busy">
+            Render as PDF
+        </button>
+    </div>
+
+    @if (_pdfBytes > 0)
+    {
+        <div class="alert alert-success">ANAF returned a @_pdfBytes byte PDF.</div>
+    }
+
+    @if (_archiveBytes > 0)
+    {
+        <div class="alert alert-success">
+            The archive is @_archiveBytes bytes. Served from local storage when it has already been
+            fetched, so opening this page repeatedly costs no allowance.
+        </div>
+    }
+
+    @if (_document.Xml is not null)
+    {
+        <h2 class="h5">Document XML</h2>
+        <pre class="border rounded p-2 bg-body-tertiary" style="max-height: 30rem; overflow: auto;"><code>@_document.Xml</code></pre>
+    }
+}
+
+@code {
+    /// <summary>ANAF's identifier for the message.</summary>
+    [Parameter]
+    public string DownloadId { get; set; } = string.Empty;
+
+    private RomaniaEFactura.EFacturaDocument? _document;
+    private AnafError? _error;
+    private int _pdfBytes;
+    private int _archiveBytes;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var result = await EFactura.GetDocumentAsync(DownloadId);
+        if (result.IsSuccess) _document = result.Value; else _error = result.Error;
+    }
+
+    private async Task DownloadArchiveAsync()
+    {
+        _busy = true;
+        var result = await EFactura.GetArchiveAsync(DownloadId);
+        _archiveBytes = result.IsSuccess ? result.Value.Length : 0;
+        if (!result.IsSuccess) _error = result.Error;
+        _busy = false;
+    }
+
+    private async Task RenderPdfAsync()
+    {
+        _busy = true;
+        var result = await EFactura.RenderPdfAsync(DownloadId);
+        _pdfBytes = result.IsSuccess ? result.Value.Length : 0;
+        if (!result.IsSuccess) _error = result.Error;
+        _busy = false;
+    }
+}

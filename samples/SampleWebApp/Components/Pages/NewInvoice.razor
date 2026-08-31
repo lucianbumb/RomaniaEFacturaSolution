@@ -1,0 +1,233 @@
+@page "/invoices/new"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject NavigationManager Navigation
+
+<PageTitle>New invoice</PageTitle>
+
+<h1>New invoice</h1>
+
+<p class="text-secondary">
+    Nothing on this form asks for a total, a VAT amount or a line net amount. EN16931 requires all
+    of them and then checks they agree with the lines; they follow from the lines, so the model
+    derives them. The running totals on the right are those derived values.
+</p>
+
+<EditForm Model="_invoice" OnValidSubmit="SendAsync" FormName="new-invoice">
+    <EFacturaValidator />
+
+    <div class="row">
+        <div class="col-lg-8">
+            <h2 class="h5 mt-3">Document</h2>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Number</label>
+                    <InputText class="form-control" @bind-Value="_invoice.Number" />
+                    <ValidationMessage For="() => _invoice.Number" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Issue date</label>
+                    <InputDate class="form-control" @bind-Value="_invoice.IssueDate" />
+                    <ValidationMessage For="() => _invoice.IssueDate" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Due date</label>
+                    <InputDate class="form-control" @bind-Value="_invoice.DueDate" />
+                    <ValidationMessage For="() => _invoice.DueDate" />
+                </div>
+            </div>
+
+            <PartyEditor Title="Seller" Party="_invoice.Seller" />
+            <PartyEditor Title="Buyer" Party="_invoice.Buyer" />
+
+            <h2 class="h5 mt-4">Lines</h2>
+            @foreach (var line in _invoice.Lines)
+            {
+                <div class="border rounded p-2 mb-2">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label">Item</label>
+                            <InputText class="form-control" @bind-Value="line.Name" />
+                            <ValidationMessage For="() => line.Name" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Quantity</label>
+                            <InputNumber class="form-control" @bind-Value="line.Quantity" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Unit</label>
+                            <InputText class="form-control" @bind-Value="line.UnitCode" />
+                            <ValidationMessage For="() => line.UnitCode" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Unit price</label>
+                            <InputNumber class="form-control" @bind-Value="line.UnitPrice" />
+                            <ValidationMessage For="() => line.UnitPrice" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label">VAT category</label>
+                            <InputSelect class="form-select" @bind-Value="line.VatCategory">
+                                @foreach (var category in Enum.GetValues<VatCategory>())
+                                {
+                                    <option value="@category">@Describe(category)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Rate %</label>
+                            <InputNumber class="form-control" @bind-Value="line.VatRate"
+                                         disabled="@(!line.VatCategory.RequiresPositiveRate())" />
+                            <ValidationMessage For="() => line.VatRate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                Exemption reason
+                                @if (line.VatCategory.RequiresExemptionReason())
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                            </label>
+                            <InputText class="form-control" @bind-Value="line.VatExemptionReason"
+                                       disabled="@(!line.VatCategory.RequiresExemptionReason())" />
+                            <ValidationMessage For="() => line.VatExemptionReason" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span class="text-secondary small">Line net @line.NetAmount.ToString("N2")</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                @onclick="() => _invoice.Lines.Remove(line)"
+                                disabled="@(_invoice.Lines.Count == 1)">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            }
+            <ValidationMessage For="() => _invoice.Lines" />
+
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="AddLine">
+                Add line
+            </button>
+
+            <h2 class="h5 mt-4">Payment</h2>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label class="form-label">IBAN</label>
+                    <InputText class="form-control" @bind-Value="_invoice.Payment!.Iban" />
+                    <ValidationMessage For="() => _invoice.Payment.Iban" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Payment terms</label>
+                    <InputText class="form-control" @bind-Value="_invoice.PaymentTerms" />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="border rounded p-3 mt-3 bg-body-tertiary sticky-top" style="top: 1rem;">
+                <h2 class="h6">Derived totals</h2>
+                <dl class="row mb-2 small">
+                    <dt class="col-7">Lines (BT-106)</dt>
+                    <dd class="col-5 text-end">@_invoice.LineTotal.ToString("N2")</dd>
+
+                    <dt class="col-7">Without VAT (BT-109)</dt>
+                    <dd class="col-5 text-end">@_invoice.TaxExclusiveTotal.ToString("N2")</dd>
+
+                    <dt class="col-7">VAT (BT-110)</dt>
+                    <dd class="col-5 text-end">@_invoice.VatTotal.ToString("N2")</dd>
+
+                    <dt class="col-7 fw-bold">Due (BT-115)</dt>
+                    <dd class="col-5 text-end fw-bold">@_invoice.PayableAmount.ToString("N2")</dd>
+                </dl>
+
+                <h3 class="h6">VAT breakdown (BG-23)</h3>
+                <table class="table table-sm small mb-3">
+                    <tbody>
+                        @foreach (var entry in _invoice.VatBreakdown)
+                        {
+                            <tr>
+                                <td>@entry.Category.ToCode() @(entry.Rate is { } rate ? $"{rate}%" : "")</td>
+                                <td class="text-end">@entry.TaxableAmount.ToString("N2")</td>
+                                <td class="text-end">@entry.VatAmount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <button type="button" class="btn btn-outline-secondary w-100 mb-2" @onclick="Verify">
+                    Verify without sending
+                </button>
+                <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
+                    Send to ANAF
+                </button>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@if (_report is not null)
+{
+    <ValidationReportView Report="_report" Heading="Verification" />
+}
+
+@if (_sendError is not null)
+{
+    <div class="alert alert-danger mt-3">
+        <h5 class="alert-heading">Not sent</h5>
+        <p class="mb-1">@_sendError.Message</p>
+        <p class="mb-0 text-secondary small">
+            Kind: <code>@_sendError.Kind</code>@(_sendError.IsTransient ? " — transient, worth retrying" : "")
+        </p>
+    </div>
+}
+
+@code {
+    private InvoiceEditModel _invoice = SampleInvoices.Blank();
+    private ValidationReport? _report;
+    private AnafError? _sendError;
+    private bool _busy;
+
+    private void AddLine() => _invoice.Lines.Add(new DocumentLineEditModel { VatRate = 21m });
+
+    private void Verify()
+    {
+        // Offline and free. Nothing leaves the process, so a form can call it as often as it likes.
+        _report = EFactura.Verify(_invoice);
+        _sendError = null;
+    }
+
+    private async Task SendAsync()
+    {
+        _busy = true;
+        _sendError = null;
+
+        var result = await EFactura.SendInvoiceAsync(_invoice);
+
+        _busy = false;
+
+        if (!result.IsSuccess)
+        {
+            _sendError = result.Error;
+            return;
+        }
+
+        // Returns as soon as ANAF accepts the upload. The outcome takes minutes to hours and is
+        // settled by the reconciler in the background, so the next page shows a pending state.
+        Navigation.NavigateTo($"/submissions/{result.Value.UploadIndex}");
+    }
+
+    private static string Describe(VatCategory category) => category switch
+    {
+        VatCategory.StandardRate => "Standard rate (S)",
+        VatCategory.ZeroRated => "Zero rated (Z)",
+        VatCategory.Exempt => "Exempt (E)",
+        VatCategory.ReverseCharge => "Reverse charge — taxare inversă (AE)",
+        VatCategory.IntraCommunitySupply => "Intra-community supply (K)",
+        VatCategory.Export => "Export outside the EU (G)",
+        VatCategory.OutsideScope => "Outside the scope of VAT (O)",
+        _ => category.ToString(),
+    };
+}

@@ -1,0 +1,118 @@
+@page "/submissions"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject RomaniaEFactura.Reconciliation.EFacturaReconciler Reconciler
+
+<PageTitle>Sent documents</PageTitle>
+
+<h1>Sent documents</h1>
+
+<p class="text-secondary">
+    Read from local records, not from ANAF — so this page is free to open as often as you like and
+    cannot exhaust the daily allowance. The background reconciler is what moves a row from pending
+    to settled.
+</p>
+
+<button class="btn btn-outline-secondary mb-3" @onclick="ReconcileAsync" disabled="@_busy">
+    Reconcile now
+</button>
+
+@if (_outcome is not null)
+{
+    <div class="alert alert-info">
+        @if (!_outcome.DidWork)
+        {
+            <text>
+                Nothing was due. ANAF caps status checks at roughly twenty a day per document, so
+                the schedule widens — 1, 2, 5, 10, 20, 40 minutes, then hours — and asking sooner
+                would only spend an allowance the document may still need. The next check time is
+                shown against each pending row.
+            </text>
+        }
+        else
+        {
+            <text>
+                Polled @_outcome.Polled, resolved @_outcome.Resolved, archives fetched
+                @_outcome.Downloaded.
+            </text>
+        }
+        @if (_outcome.QuotaExhausted > 0)
+        {
+            <strong>@_outcome.QuotaExhausted deferred to tomorrow — the daily allowance is spent.</strong>
+        }
+    </div>
+}
+
+@if (_submissions is null)
+{
+    <p><em>Loading&hellip;</em></p>
+}
+else if (_submissions.Count == 0)
+{
+    <p class="text-secondary">Nothing sent yet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Document</th><th>ANAF index</th><th>State</th><th>Sent</th><th>Archive</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var submission in _submissions)
+            {
+                <tr>
+                    <td>@(submission.DocumentId ?? "—")</td>
+                    <td><code>@submission.UploadIndex</code></td>
+                    <td>
+                        @if (submission.IsAccepted)
+                        {
+                            <span class="badge text-bg-success">Accepted</span>
+                        }
+                        else if (submission.IsRejected)
+                        {
+                            <span class="badge text-bg-danger">Rejected</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Waiting on ANAF</span>
+                            <div class="small text-secondary">
+                                next check @submission.NextPollAt.LocalDateTime.ToString("t")
+                            </div>
+                        }
+                    </td>
+                    <td>@submission.SubmittedAt.LocalDateTime.ToString("g")</td>
+                    <td>@(submission.HasArchive ? "stored" : "—")</td>
+                    <td><a href="/submissions/@submission.UploadIndex">Open</a></td>
+                </tr>
+                @if (submission.LastError is not null)
+                {
+                    <tr>
+                        <td colspan="6" class="small text-danger">@submission.LastError</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<SubmissionStatus>? _submissions;
+    private RomaniaEFactura.Reconciliation.ReconcileOutcome? _outcome;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _submissions = await EFactura.GetSubmissionsAsync();
+
+    private async Task ReconcileAsync()
+    {
+        // The hosted service does this on a schedule. Exposed here so a demo need not wait, and
+        // because an application may legitimately want to force a check.
+        _busy = true;
+        _outcome = await Reconciler.RunOnceAsync();
+        _busy = false;
+        await LoadAsync();
+    }
+}

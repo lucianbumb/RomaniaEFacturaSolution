@@ -1,7 +1,54 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
 
-<PageTitle>Home</PageTitle>
+<PageTitle>e-Factura sample</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Romanian e-Factura</h1>
 
-Welcome to your new app.
+<p class="lead">
+    Every method on <code>IRomaniaEFacturaService</code>, reachable from a page. This app is the
+    library's documentation as much as its demonstration.
+</p>
+
+@if (_status is not null && !_status.IsConnected)
+{
+    <div class="alert alert-warning">
+        <strong>Not authorized.</strong> Nothing can be sent or downloaded for CIF
+        @_status.Cif until someone authorizes it — <a href="/connect">start here</a>.
+    </div>
+}
+
+<h2 class="h4 mt-4">Registration</h2>
+<pre class="border rounded p-3 bg-body-tertiary"><code>builder.AddRomaniaEFactura(
+    configureDatabase: options =&gt; options.UseSqlite(connectionString));
+
+app.MapEFacturaAuthorization();</code></pre>
+
+<p>
+    That is the whole setup. Options bind from the <code>EFactura</code> configuration section;
+    inject <code>IRomaniaEFacturaService</code> wherever you need it.
+</p>
+
+<h2 class="h4 mt-4">Running against the mock</h2>
+<p>
+    <code>appsettings.json</code> points <code>ApiBaseAddress</code> and
+    <code>OAuthBaseAddress</code> at <code>MockAnafServer</code>. Start that project first, or
+    remove both settings to talk to ANAF's real test environment — nothing else changes.
+</p>
+
+<h2 class="h4 mt-4">Where to look</h2>
+<ul>
+    <li><a href="/connect">Connection</a> — the authorize flow, and the "not authorized yet" state.</li>
+    <li><a href="/invoices/new">New invoice</a> — the edit model, live derived totals, BR-coded verification.</li>
+    <li><a href="/other">Credit notes &amp; messages</a> — credit note, buyer message, raw XML escape hatch.</li>
+    <li><a href="/submissions">Sent</a> — what the background reconciler has established.</li>
+    <li><a href="/inbox">Inbox</a> — watermark sync, discriminated documents, archive and PDF.</li>
+</ul>
+
+@code {
+    private AuthorizationStatus? _status;
+
+    protected override async Task OnInitializedAsync() =>
+        _status = await EFactura.GetAuthorizationStatusAsync();
+}
