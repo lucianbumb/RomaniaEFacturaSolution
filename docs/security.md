@@ -83,6 +83,28 @@ should pass the `user` argument for the same reason. A state that records nobody
 it is still accepted, because refusing it would break a legitimate caller, and the authorization
 requirement is what protects that case.
 
+## Reading a downloaded archive
+
+`EFacturaArchiveReader.Read` stops once an archive has expanded past a budget — by default 64 MB
+across every entry and every level of nesting, and at most 256 entries. Both are far above anything
+real: ANAF caps an upload at 10 MB, and an archive holds one document, its signature and sometimes
+a PDF.
+
+The check happens **during** the copy rather than before it. A ZIP records its own uncompressed
+sizes, and whoever built the archive wrote them, so consulting `ZipArchiveEntry.Length` first would
+trust the thing being defended against — while reading the entry whole in order to measure it is
+the allocation the limit exists to prevent. DEFLATE reaches roughly a thousand to one, so a 42 KB
+file expands to more memory than the process has.
+
+The archive normally arrives from ANAF over TLS, so this is hardening rather than a reachable hole.
+It is worth having because `EFacturaArchiveReader` is public API, and an application that lets
+somebody upload an archive for inspection is one feature away.
+
+```csharp
+// Only if you know better than the default.
+var document = EFacturaArchiveReader.Read(bytes, new ArchiveLimits { MaxTotalUncompressedBytes = 8L * 1024 * 1024 });
+```
+
 ## What the library already does
 
 - **Tokens are encrypted at rest** with `IDataProtector`, under a versioned purpose string, and a
@@ -94,9 +116,11 @@ requirement is what protects that case.
   because they arrived inside the protected state.
 - **Downloaded XML is parsed with DTD processing prohibited and no resolver**, so a document from
   ANAF cannot reference external entities.
-- **The client secret travels as HTTP Basic to ANAF's token endpoint only**, and no response body
-  containing a token is logged — `AnafError.ToString()` deliberately omits the raw body it carries
-  for diagnostics.
+- **The client secret travels as HTTP Basic to ANAF's token endpoint only**, and `AnafError`
+  overrides `ToString()` to print just the kind and the message, keeping the raw response body it
+  carries for diagnostics out of every log line the library writes. A logging sink configured to
+  destructure objects rather than format them can still reach that property; it holds ANAF error
+  bodies, which is why it exists, so treat it as you would any other diagnostic payload.
 
 ## What the host application owns
 
