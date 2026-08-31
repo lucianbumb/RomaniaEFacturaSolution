@@ -88,7 +88,12 @@ public sealed class EFacturaReconciler(
         ReconcileOutcome outcome,
         CancellationToken cancellationToken)
     {
-        var status = await api.GetStatusAsync(submission.UploadIndex, cancellationToken).ConfigureAwait(false);
+        // As the company that submitted it, not as whoever is configured. A deployment serving
+        // several would otherwise poll every submission with one account, and ANAF would answer
+        // NoRights for all but one of them - which reads as misconfiguration rather than a bug,
+        // while the submission is retried on its widening schedule and never settles.
+        var status = await api.GetStatusAsync(submission.UploadIndex, submission.Cif, cancellationToken)
+            .ConfigureAwait(false);
 
         if (!status.IsSuccess)
         {
@@ -125,7 +130,8 @@ public sealed class EFacturaReconciler(
         // The archive holds the ministry's signature, which is the proof of submission and has to
         // be retained. Fetching it immediately means it is captured while the download allowance
         // for this identifier is certainly untouched.
-        var archive = await api.DownloadArchiveAsync(downloadId, cancellationToken).ConfigureAwait(false);
+        var archive = await api.DownloadArchiveAsync(downloadId, submission.Cif, cancellationToken)
+            .ConfigureAwait(false);
         if (archive.IsSuccess)
         {
             submission.Archive = archive.Value;

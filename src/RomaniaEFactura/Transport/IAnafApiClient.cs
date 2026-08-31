@@ -25,8 +25,16 @@ public interface IAnafApiClient
     /// <remarks>
     /// Capped at roughly twenty calls per document per day, so this must not be polled on a timer.
     /// </remarks>
+    /// <param name="uploadIndex">ANAF's <c>index_incarcare</c>.</param>
+    /// <param name="cif">
+    /// Whose submission it is, defaulting to the configured company. It decides which stored
+    /// authorization the call is made with, so a deployment serving several companies has to pass
+    /// the one the submission belongs to or ANAF will answer that it has no rights.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<AnafResult<MessageStatus>> GetStatusAsync(
         string uploadIndex,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Lists messages from the last <paramref name="days"/> days.</summary>
@@ -61,8 +69,15 @@ public interface IAnafApiClient
     /// Capped at roughly ten calls per identifier per day. The archive should be retained: the
     /// signature is the proof of submission.
     /// </remarks>
+    /// <param name="downloadId">ANAF's download identifier.</param>
+    /// <param name="cif">
+    /// Whose message it is, defaulting to the configured company. It decides which stored
+    /// authorization the call is made with, and therefore which documents ANAF will hand over.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<AnafResult<byte[]>> DownloadArchiveAsync(
         string downloadId,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Runs ANAF's online validator over a document.</summary>

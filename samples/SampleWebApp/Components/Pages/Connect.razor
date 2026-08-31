@@ -1,5 +1,6 @@
 @page "/connect"
 @rendermode InteractiveServer
+@using RomaniaEFactura.Validation
 @inject IRomaniaEFacturaService EFactura
 @inject NavigationManager Navigation
 
@@ -34,7 +35,21 @@ else if (!_status.IsConnected)
             No usable authorization is stored for CIF <strong>@_status.Cif</strong>. Nothing can be
             sent or downloaded for this company until someone authorizes it.
         </p>
-        <a class="btn btn-primary" href="@ConnectUrl()">Authorize with ANAF</a>
+
+        @if (RomanianCif.IsValid(_status.Cif))
+        {
+            <a class="btn btn-primary" href="@ConnectUrl()">Authorize with ANAF</a>
+        }
+        else
+        {
+            @* The library refuses a fiscal code whose control digit does not match, so offering
+               the link here would send someone to a bad request instead of to ANAF. *@
+            <p class="mb-0">
+                <strong>@_status.Cif</strong> is not a valid Romanian fiscal code &mdash; the
+                control digit does not match, so ANAF would refuse it. Correct it above and check
+                again.
+            </p>
+        }
     </div>
 
     <p class="text-secondary small">

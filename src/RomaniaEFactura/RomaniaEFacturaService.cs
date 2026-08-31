@@ -289,7 +289,7 @@ public sealed class RomaniaEFacturaService(
             {
                 if (string.IsNullOrEmpty(message.RequestId)) continue;
 
-                var resolved = await api.GetStatusAsync(message.RequestId, cancellationToken).ConfigureAwait(false);
+                var resolved = await api.GetStatusAsync(message.RequestId, company, cancellationToken).ConfigureAwait(false);
                 if (!resolved.IsSuccess || resolved.Value.DownloadId is null) continue;
 
                 downloadId = resolved.Value.DownloadId;
@@ -380,7 +380,7 @@ public sealed class RomaniaEFacturaService(
 
         // Nothing held for this company. Asking ANAF is still safe for an identifier belonging to
         // another: it refuses a download the account has no rights on, which arrives as NoRights.
-        var downloaded = await api.DownloadArchiveAsync(downloadId, cancellationToken).ConfigureAwait(false);
+        var downloaded = await api.DownloadArchiveAsync(downloadId, company, cancellationToken).ConfigureAwait(false);
         if (!downloaded.IsSuccess) return downloaded;
 
         if (stored is not null)

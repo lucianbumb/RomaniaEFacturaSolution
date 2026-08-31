@@ -143,6 +143,12 @@ three boundaries: the transport, the OAuth client, and the `connect/{cif}` endpo
 The authorization path is the one that matters. `ExchangeCodeAsync` stores a token under whatever
 the caller named, so an unchecked value became a row no call could ever match against.
 
+The check lives at the boundaries that act on a CIF, not on the read-only status call.
+`GetAuthorizationStatusAsync` with a malformed code answers "not connected", which is truthful —
+a value that is not a company has no authorization — rather than throwing at somebody typing into a
+form. The sample uses `RomanianCif.IsValid` to say so on the page instead of offering a link that
+would be refused.
+
 ### What this is not
 
 The per-company pacing state (`CompanyGates`, `LastCallPerCompany`, `RefreshGates`) is held in
@@ -177,6 +183,12 @@ archives on purpose**, because downloads are capped at roughly ten per identifie
 cached archive never reaches ANAF. Whatever check exists happens in the local query or it does not
 happen at all. ANAF's download identifiers are short numeric strings, so enumerating them is no
 obstacle.
+
+The same CIF decides **which stored authorization the ANAF call is made with** when nothing is
+held locally, and the reconciler polls each submission as the company that made it. Without that,
+a deployment serving several companies polled every submission with one account: ANAF answers
+`NoRights`, the submission is retried on its widening schedule and never settles, and the log reads
+as misconfiguration rather than as a bug.
 
 If your application has no configured CIF and passes one on every call, these methods will throw
 rather than guess. That is deliberate: an application serving several companies has to say whose
