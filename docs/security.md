@@ -143,6 +143,12 @@ three boundaries: the transport, the OAuth client, and the `connect/{cif}` endpo
 The authorization path is the one that matters. `ExchangeCodeAsync` stores a token under whatever
 the caller named, so an unchecked value became a row no call could ever match against.
 
+The check lives at the boundaries that act on a CIF, not on the read-only status call.
+`GetAuthorizationStatusAsync` with a malformed code answers "not connected", which is truthful —
+a value that is not a company has no authorization — rather than throwing at somebody typing into a
+form. The sample uses `RomanianCif.IsValid` to say so on the page instead of offering a link that
+would be refused.
+
 ### What this is not
 
 The per-company pacing state (`CompanyGates`, `LastCallPerCompany`, `RefreshGates`) is held in
