@@ -467,6 +467,28 @@ public sealed class Item
     /// <summary>VAT category applying to the item (BG-30).</summary>
     [XmlElement("ClassifiedTaxCategory", Namespace = UblNamespaces.Cac)]
     public LineTaxCategory ClassifiedTaxCategory { get; set; } = new();
+
+    /// <summary>Item attributes (BG-32) — name and value pairs describing the goods.</summary>
+    [XmlElement("AdditionalItemProperty", Namespace = UblNamespaces.Cac)]
+    public List<ItemProperty> AdditionalItemProperties { get; set; } = [];
+}
+
+/// <summary>
+/// One attribute of an item (BG-32): colour, size, a serial number.
+/// </summary>
+/// <remarks>
+/// Both halves are mandatory — BR-54 — because an attribute with only a name says nothing and one
+/// with only a value says nothing about what it is.
+/// </remarks>
+public sealed class ItemProperty
+{
+    /// <summary>What the attribute is (BT-160).</summary>
+    [XmlElement("Name", Namespace = UblNamespaces.Cbc)]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>What it is set to (BT-161).</summary>
+    [XmlElement("Value", Namespace = UblNamespaces.Cbc)]
+    public string Value { get; set; } = string.Empty;
 }
 
 /// <summary>

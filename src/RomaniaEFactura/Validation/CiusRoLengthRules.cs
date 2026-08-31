@@ -121,6 +121,14 @@ internal static class CiusRoLengthRules
             yield return ("BR-RO-L303", CiusRoLengths.LineNote, line.Note,
                 "The line note (BT-127)", line.Path);
 
+            foreach (var (attribute, index) in line.ItemAttributes.Select((a, i) => (a, i)))
+            {
+                yield return ("BR-RO-L0505", CiusRoLengths.ItemAttributeName, attribute.Name,
+                    $"The name of item attribute {index + 1} (BT-160)", line.Path);
+                yield return ("BR-RO-L1025", CiusRoLengths.ItemAttributeValue, attribute.Value,
+                    $"The value of item attribute {index + 1} (BT-161)", line.Path);
+            }
+
             foreach (var (adjustment, index) in line.AllowanceCharges.Select((a, i) => (a, i)))
             {
                 yield return (adjustment.ChargeIndicator ? "BR-RO-L1023" : "BR-RO-L1022",
@@ -184,6 +192,14 @@ internal static class CiusRoLengthRules
                 $"A document may reference at most {CiusRoLengths.MaxPrecedingDocuments} preceding "
                 + $"documents (BG-3); this one references {doc.PrecedingDocumentCount}.",
                 Path: "BillingReferences"));
+        }
+
+        foreach (var line in doc.Lines.Where(l => l.ItemAttributes.Count > CiusRoLengths.MaxItemAttributes))
+        {
+            findings.Add(new("BR-RO-A052",
+                $"A line may carry at most {CiusRoLengths.MaxItemAttributes} item attributes (BG-32); "
+                + $"this one carries {line.ItemAttributes.Count}.",
+                Path: line.Path));
         }
 
         if (doc.SupportingDocumentCount > CiusRoLengths.MaxSupportingDocuments)

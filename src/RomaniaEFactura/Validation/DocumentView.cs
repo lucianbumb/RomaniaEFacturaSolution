@@ -176,6 +176,9 @@ internal sealed record LineView
     /// <summary>Period the line covers (BG-26).</summary>
     public Period? InvoicePeriod { get; init; }
 
+    /// <summary>Item attributes (BG-32), which CIUS-RO caps by both count and length.</summary>
+    public IReadOnlyList<ItemProperty> ItemAttributes => Item?.AdditionalItemProperties ?? [];
+
     /// <summary>A human-readable path to this line, for a finding.</summary>
     public string Path => $"Lines[{Index}]";
 }

@@ -137,6 +137,15 @@ public sealed class DocumentLineEditModel : IValidatableObject
     [Display(Name = "VAT exemption code")]
     public string? VatExemptionReasonCode { get; set; }
 
+    /// <summary>
+    /// Attributes of the item (BG-32) — colour, size, a serial number.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from the description: an attribute is a name and a value, which a buyer's system
+    /// can act on, where a description is prose. CIUS-RO allows at most 50 per line.
+    /// </remarks>
+    public List<ItemAttributeEditModel> ItemAttributes { get; set; } = [];
+
     /// <summary>A free-text note for this line (BT-127).</summary>
     [StringLength(CiusRoLengths.LineNote)]
     [Display(Name = "Note")]
@@ -197,4 +206,26 @@ public sealed class DocumentLineEditModel : IValidatableObject
                 [nameof(ChargeReason)]);
         }
     }
+}
+
+/// <summary>
+/// One attribute of the item on a line (BG-32).
+/// </summary>
+/// <remarks>
+/// Both halves are required by BR-54, and for the obvious reason: a name with no value says
+/// nothing, and a value with no name says nothing about what it describes.
+/// </remarks>
+public sealed class ItemAttributeEditModel
+{
+    /// <summary>What the attribute is — "Culoare", "Serial number" (BT-160).</summary>
+    [Required(ErrorMessage = "An item attribute must have a name (BT-160).")]
+    [StringLength(CiusRoLengths.ItemAttributeName, MinimumLength = 1)]
+    [Display(Name = "Attribute")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>What it is set to (BT-161).</summary>
+    [Required(ErrorMessage = "An item attribute must have a value (BT-161).")]
+    [StringLength(CiusRoLengths.ItemAttributeValue, MinimumLength = 1)]
+    [Display(Name = "Value")]
+    public string Value { get; set; } = string.Empty;
 }

@@ -383,6 +383,18 @@ public static class CiusRoValidator
                 findings.Add(new("BR-27", "The net unit price (BT-146) must not be negative.", Path: line.Path));
             }
 
+            // BR-54: an attribute with only a name says nothing, and one with only a value says
+            // nothing about what it describes.
+            foreach (var (attribute, index) in line.ItemAttributes.Select((a, i) => (a, i)))
+            {
+                if (string.IsNullOrWhiteSpace(attribute.Name) || string.IsNullOrWhiteSpace(attribute.Value))
+                {
+                    findings.Add(new("BR-54",
+                        $"Item attribute {index + 1} must have both a name (BT-160) and a value (BT-161).",
+                        Path: line.Path));
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(line.Item?.ClassifiedTaxCategory?.Id?.Value))
             {
                 findings.Add(new("BR-CO-04", "Each line must have a VAT category code (BT-151).", Path: line.Path));
