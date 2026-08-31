@@ -129,6 +129,17 @@ public sealed class AddressEditModel : IValidatableObject
     public string? StreetAdditional { get; set; }
 
     /// <summary>
+    /// A third address line (BT-162 / BT-163 / BT-165).
+    /// </summary>
+    /// <remarks>
+    /// Rarely needed. <see cref="Street"/> is line one and <see cref="StreetAdditional"/> line two;
+    /// this is the third, which UBL nests in an element of its own rather than naming directly.
+    /// </remarks>
+    [StringLength(CiusRoLengths.AddressLine2)]
+    [Display(Name = "Address line 3")]
+    public string? AddressLine3 { get; set; }
+
+    /// <summary>
     /// Town or city (BT-37).
     /// </summary>
     /// <remarks>

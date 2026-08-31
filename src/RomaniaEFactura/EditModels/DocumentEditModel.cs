@@ -88,6 +88,37 @@ public abstract class DocumentEditModel : IValidatableObject
     [Display(Name = "Purchase order")]
     public string? OrderReference { get; set; }
 
+    /// <summary>The contract this invoice is issued under (BT-12).</summary>
+    [StringLength(CiusRoLengths.ContractReference)]
+    [Display(Name = "Contract")]
+    public string? ContractReference { get; set; }
+
+    /// <summary>
+    /// The seller's own order number (BT-14).
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="OrderReference"/>, which is the buyer's. UBL puts both in the same
+    /// element, so a document carrying only this one still emits an <c>OrderReference</c>.
+    /// </remarks>
+    [StringLength(CiusRoLengths.ContractReference)]
+    [Display(Name = "Sales order")]
+    public string? SalesOrderReference { get; set; }
+
+    /// <summary>Receiving advice reference (BT-15), where the buyer confirmed the goods.</summary>
+    [StringLength(CiusRoLengths.ContractReference)]
+    [Display(Name = "Receiving advice")]
+    public string? ReceivingAdviceReference { get; set; }
+
+    /// <summary>Despatch advice reference (BT-16), where the seller announced the shipment.</summary>
+    [StringLength(CiusRoLengths.ContractReference)]
+    [Display(Name = "Despatch advice")]
+    public string? DespatchAdviceReference { get; set; }
+
+    /// <summary>Tender or lot reference (BT-17), for a public procurement award.</summary>
+    [StringLength(CiusRoLengths.ContractReference)]
+    [Display(Name = "Tender or lot")]
+    public string? TenderOrLotReference { get; set; }
+
     /// <summary>Buyer's accounting reference for the document (BT-19).</summary>
     [StringLength(CiusRoLengths.AccountingReference)]
     [Display(Name = "Cost centre")]
