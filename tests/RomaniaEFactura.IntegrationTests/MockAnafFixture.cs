@@ -65,6 +65,18 @@ public sealed class MockAnafFixture : WebApplicationFactory<Program>
         return (await response.Content.ReadFromJsonAsync<SeededMessage>())!;
     }
 
+    /// <summary>What the mock received on its most recent upload.</summary>
+    public async Task<ReceivedUpload> LastUploadAsync()
+    {
+        using var client = CreateClient();
+        using var response = await client.GetAsync("/__mock/last-upload");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ReceivedUpload>())!;
+    }
+
     /// <summary>Identifiers for a seeded message.</summary>
     public sealed record SeededMessage(string Id, string IdSolicitare, bool HideId);
+
+    /// <summary>An upload as the mock recorded it.</summary>
+    public sealed record ReceivedUpload(string IndexIncarcare, string Cif, string Standard, string Xml);
 }

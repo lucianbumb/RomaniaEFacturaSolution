@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RomaniaEFactura.Authentication;
 using RomaniaEFactura.Configuration;
+using RomaniaEFactura.EditModels;
 using RomaniaEFactura.Persistence;
 using RomaniaEFactura.Reconciliation;
 using RomaniaEFactura.Transport;
@@ -56,6 +57,17 @@ public sealed class RomaniaEFacturaService(
     public ValidationReport Verify(UblCreditNote creditNote) => CiusRoValidator.Validate(creditNote);
 
     /// <inheritdoc />
+    public ValidationReport Verify(InvoiceEditModel invoice) => EditModelValidator.Validate(invoice);
+
+    /// <inheritdoc />
+    public ValidationReport Verify(CreditNoteEditModel creditNote) =>
+        EditModelValidator.Validate(creditNote);
+
+    /// <inheritdoc />
+    public ValidationReport Verify(BuyerMessageEditModel message) =>
+        EditModelValidator.Validate(message);
+
+    /// <inheritdoc />
     public async Task<AnafResult<SubmissionReceipt>> SendInvoiceAsync(
         UblInvoice invoice,
         string? cif = null,
@@ -94,6 +106,69 @@ public sealed class RomaniaEFacturaService(
             creditNote.Id?.Value,
             cif,
             options ?? new UploadOptions(AnafStandard.CreditNote),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AnafResult<SubmissionReceipt>> SendInvoiceAsync(
+        InvoiceEditModel invoice,
+        string? cif = null,
+        UploadOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        // Validated as a model rather than as UBL, so a problem is reported against the field the
+        // caller filled in instead of against an XPath into a document they never wrote.
+        var report = Verify(invoice);
+        if (!report.IsValid) return Invalid<SubmissionReceipt>(report);
+
+        return await SubmitAsync(
+            UblSerializer.Serialize(invoice.ToUbl()),
+            invoice.Number,
+            cif,
+            options ?? new UploadOptions(AnafStandard.Ubl),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AnafResult<SubmissionReceipt>> SendCreditNoteAsync(
+        CreditNoteEditModel creditNote,
+        string? cif = null,
+        UploadOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(creditNote);
+
+        var report = Verify(creditNote);
+        if (!report.IsValid) return Invalid<SubmissionReceipt>(report);
+
+        return await SubmitAsync(
+            UblSerializer.Serialize(creditNote.ToUbl()),
+            creditNote.Number,
+            cif,
+            options ?? new UploadOptions(AnafStandard.CreditNote),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AnafResult<SubmissionReceipt>> SendBuyerMessageAsync(
+        BuyerMessageEditModel message,
+        string? cif = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        var report = Verify(message);
+        if (!report.IsValid) return Invalid<SubmissionReceipt>(report);
+
+        // The standard is not the caller's to choose here: a buyer message is only ever RASP, and
+        // any other value would be refused at upload.
+        return await SubmitAsync(
+            message.ToXml(),
+            message.UploadIndex,
+            cif,
+            new UploadOptions(AnafStandard.BuyerMessage),
             cancellationToken).ConfigureAwait(false);
     }
 

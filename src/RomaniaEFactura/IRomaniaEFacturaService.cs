@@ -1,3 +1,4 @@
+using RomaniaEFactura.EditModels;
 using RomaniaEFactura.Transport;
 using RomaniaEFactura.Ubl;
 using RomaniaEFactura.Validation;
@@ -41,12 +42,28 @@ public interface IRomaniaEFacturaService
     /// <remarks>
     /// If this reports valid, ANAF will not reject the document on format grounds. It makes no
     /// claim about whether the submission will succeed — that depends on authorization, rights and
-    /// connectivity, which come back from <see cref="SendInvoiceAsync"/> as typed results.
+    /// connectivity, which come back from <see cref="SendInvoiceAsync(UblInvoice, string, UploadOptions, CancellationToken)"/>
+    /// as typed results.
     /// </remarks>
     ValidationReport Verify(UblInvoice invoice);
 
     /// <inheritdoc cref="Verify(UblInvoice)" />
     ValidationReport Verify(UblCreditNote creditNote);
+
+    /// <summary>
+    /// Checks a filled-in invoice model, and the document it would produce.
+    /// </summary>
+    /// <remarks>
+    /// The route most applications want. Field-level problems come back against the model's own
+    /// property paths, so a form can put each one beside the input that caused it.
+    /// </remarks>
+    ValidationReport Verify(InvoiceEditModel invoice);
+
+    /// <inheritdoc cref="Verify(InvoiceEditModel)" />
+    ValidationReport Verify(CreditNoteEditModel creditNote);
+
+    /// <inheritdoc cref="Verify(InvoiceEditModel)" />
+    ValidationReport Verify(BuyerMessageEditModel message);
 
     /// <summary>
     /// Submits an invoice and records it for reconciliation.
@@ -61,11 +78,43 @@ public interface IRomaniaEFacturaService
         UploadOptions? options = null,
         CancellationToken cancellationToken = default);
 
-    /// <inheritdoc cref="SendInvoiceAsync" />
+    /// <inheritdoc cref="SendInvoiceAsync(UblInvoice, string, UploadOptions, CancellationToken)" />
     Task<AnafResult<SubmissionReceipt>> SendCreditNoteAsync(
         UblCreditNote creditNote,
         string? cif = null,
         UploadOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Submits a filled-in invoice model, mapping it to UBL along the way.
+    /// </summary>
+    /// <remarks>
+    /// Verified first, exactly as <see cref="Verify(InvoiceEditModel)"/> would, so an invalid model
+    /// comes back as a validation result rather than reaching ANAF.
+    /// </remarks>
+    Task<AnafResult<SubmissionReceipt>> SendInvoiceAsync(
+        InvoiceEditModel invoice,
+        string? cif = null,
+        UploadOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc cref="SendInvoiceAsync(InvoiceEditModel, string, UploadOptions, CancellationToken)" />
+    Task<AnafResult<SubmissionReceipt>> SendCreditNoteAsync(
+        CreditNoteEditModel creditNote,
+        string? cif = null,
+        UploadOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a buyer's message back to the seller of an invoice already received (RASP).
+    /// </summary>
+    /// <remarks>
+    /// How a buyer disputes an invoice inside e-Factura rather than by email. It travels the same
+    /// upload path as a document and is reconciled the same way.
+    /// </remarks>
+    Task<AnafResult<SubmissionReceipt>> SendBuyerMessageAsync(
+        BuyerMessageEditModel message,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

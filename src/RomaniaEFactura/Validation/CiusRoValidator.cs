@@ -72,6 +72,13 @@ public static class CiusRoValidator
         {
             findings.Add(new("BR-02", "The document must have a number (BT-1).", Path: "Id"));
         }
+        else if (!doc.Id.Any(char.IsAsciiDigit))
+        {
+            // BR-RO-010. Romania adds this to EN16931: a purely alphabetic number is refused.
+            findings.Add(new("BR-RO-010",
+                $"The document number '{doc.Id}' must contain at least one digit (BT-1).",
+                Path: "Id"));
+        }
 
         if (doc.IssueDate == default)
         {
@@ -93,6 +100,20 @@ public static class CiusRoValidator
     {
         CheckParty(doc.Seller, "Seller", "BR-06", "BR-08", "BR-09", findings);
         CheckParty(doc.Buyer, "Buyer", "BR-07", "BR-10", "BR-11", findings);
+
+        // BR-RO-201/202/211/212 apply the same subdivision and sector rules to where the goods
+        // went, which is a separate address and is missed easily because it is optional.
+        var deliveryAddress = doc.Delivery?.DeliveryLocation?.Address;
+        CheckRomanianAddress(deliveryAddress, "Delivery", findings);
+
+        // BR-RO-210 goes further than the seller and buyer rules: a delivery address must name a
+        // subdivision whatever its country, not only when that country is Romania.
+        if (deliveryAddress is not null && string.IsNullOrWhiteSpace(deliveryAddress.CountrySubentity))
+        {
+            findings.Add(new("BR-RO-210",
+                "A delivery address must state its country subdivision (BT-79).",
+                Path: "Delivery.Address.CountrySubentity"));
+        }
     }
 
     private static void CheckParty(
@@ -120,15 +141,7 @@ public static class CiusRoValidator
                 Path: $"{role}.PostalAddress.Country"));
         }
 
-        // ANAF requires the county subdivision for Romanian addresses (ISO 3166-2:RO).
-        var countryCode = party.PostalAddress?.Country?.IdentificationCode;
-        if (string.Equals(countryCode, "RO", StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(party.PostalAddress?.CountrySubentity))
-        {
-            findings.Add(new("BR-RO-090",
-                $"A Romanian {role.ToLowerInvariant()} address must have a county code such as RO-B or RO-CJ (BT-39).",
-                Path: $"{role}.PostalAddress.CountrySubentity"));
-        }
+        CheckRomanianAddress(party.PostalAddress, role, findings);
 
         // Enforced by ANAF outside the Schematron: the party must be identifiable, and a Romanian
         // CIF must carry a correct control digit.
@@ -171,6 +184,58 @@ public static class CiusRoValidator
                     $"The {role.ToLowerInvariant()} VAT identifier '{vatId}' must start with a country code, for example RO{vatId}.",
                     Path: $"{role}.PartyTaxScheme"));
             }
+        }
+    }
+
+    /// <summary>
+    /// The subdivision and city rules CIUS-RO adds for Romanian addresses.
+    /// </summary>
+    /// <remarks>
+    /// Shared between the seller, the buyer and the delivery address because the Schematron states
+    /// the same three rules three times over, once per role — BR-RO-090/100/110 for the seller,
+    /// BR-RO-092/101/111 for the buyer, BR-RO-201/202/211/212 for the delivery address.
+    /// </remarks>
+    private static void CheckRomanianAddress(
+        PostalAddress? address,
+        string role,
+        List<ValidationFinding> findings)
+    {
+        if (address is null) return;
+        if (!string.Equals(address.Country?.IdentificationCode, "RO", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var subdivision = address.CountrySubentity?.Trim();
+        var noun = role.ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(subdivision))
+        {
+            findings.Add(new("BR-RO-090",
+                $"A Romanian {noun} address must have a county code such as RO-B or RO-CJ (BT-39).",
+                Path: $"{role}.PostalAddress.CountrySubentity"));
+            return;
+        }
+
+        if (!RomanianCounties.IsValid(subdivision))
+        {
+            findings.Add(new("BR-RO-110",
+                $"'{subdivision}' is not an ISO 3166-2:RO county code (BT-39). "
+                + "ANAF requires a code such as RO-B or RO-CJ, not a county name.",
+                Path: $"{role}.PostalAddress.CountrySubentity"));
+            return;
+        }
+
+        // BR-RO-100. Bucharest is the one county whose city is a code rather than a name: ANAF
+        // rejects "Bucuresti" and expects the sector. Nothing signals this in the address itself,
+        // so an otherwise perfect invoice from a Bucharest company is refused without it.
+        if (string.Equals(subdivision, "RO-B", StringComparison.Ordinal)
+            && !RomanianCounties.IsBucharestSector(address.CityName))
+        {
+            findings.Add(new("BR-RO-100",
+                $"A {noun} in Bucharest (RO-B) must state the city as a sector code — "
+                + $"{string.Join(", ", RomanianCounties.BucharestSectors)} — not '{address.CityName}' (BT-37).",
+                Path: $"{role}.PostalAddress.CityName"));
         }
     }
 
@@ -472,6 +537,30 @@ public static class CiusRoValidator
             findings.Add(new($"{rules.Family}-08",
                 $"The taxable amount for the '{code}' entry is {subtotal.TaxableAmount.Value}, but the lines in that category total {expectedTaxable}.",
                 Path: "TaxTotals"));
+        }
+
+        // BR-IC-11 / BR-IC-12: an intra-community supply is zero-rated only if the goods can be
+        // shown to have left the country, so the document must say when and where they went.
+        if (string.Equals(code, "K", StringComparison.Ordinal))
+        {
+            var hasPeriod = doc.InvoicePeriod?.StartDate is not null
+                            || doc.InvoicePeriod?.EndDate is not null;
+
+            if (doc.Delivery?.ActualDeliveryDate is null && !hasPeriod)
+            {
+                findings.Add(new("BR-IC-11",
+                    "An intra-community supply must state the delivery date (BT-72) or the "
+                    + "invoicing period (BG-14).",
+                    Path: "Delivery"));
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    doc.Delivery?.DeliveryLocation?.Address?.Country?.IdentificationCode))
+            {
+                findings.Add(new("BR-IC-12",
+                    "An intra-community supply must state the country the goods were delivered to (BT-80).",
+                    Path: "Delivery"));
+            }
         }
 
         // BR-AE-02 / BR-AE-03: reverse charge requires both parties to be VAT-identified, since

@@ -263,9 +263,56 @@ Both of these produced schema-invalid XML in v2 and are worth stating explicitly
   `2026-08-31T00:00:00` for a `DateTime` unless the member is annotated
   `[XmlElement(DataType = "date")]`.
 
+## The buyer message (RASP)
+
+A buyer answers a received invoice by uploading a message with `standard=RASP`. It is not UBL and
+carries none of the EN16931 rules — one element with two attributes:
+
+```xml
+<header xmlns="mfp:anaf:dgti:spv:reqMesaj:v1"
+        index_incarcare="3828"
+        message="Cantitatea livrata nu corespunde comenzii."/>
+```
+
+**This is the one wire format here that is not confirmed by an ANAF source.** ANAF publishes no
+schema for it, and it appears in none of the four OpenAPI specifications the rest of this document
+is built from — the API documentation names `RASP` as a valid `standard` value and says nothing
+more. The shape above is corroborated by two independent third-party sources that agree on the
+namespace and both attribute names, which is enough to implement against and not enough to call
+confirmed. Sending one against the real test environment settles it.
+
+## CIUS-RO rules that surprise
+
+Romania narrows EN16931 in ways that are not visible from the European specification. These were
+found by running generated documents through `ROeFacturaValidator.jar`, not by reading:
+
+| Rule | What it demands |
+|---|---|
+| **BR-RO-100 / 101** | If the country is `RO` and the county is `RO-B` (Bucharest), the **city must be a sector code** — `SECTOR1` … `SECTOR6`. `Bucuresti` is rejected. Nothing in the address hints at the exception, and it applies to the seller, the buyer and the delivery address alike. |
+| BR-RO-110 / 111 | A Romanian address states its county as an ISO 3166-2:RO code (`RO-B`, `RO-CJ`), never as a county name. |
+| BR-RO-210 | A delivery address must state a country subdivision **whatever its country** — stricter than the seller and buyer rules, which only demand one for Romanian addresses. |
+| BR-RO-010 | The document number must contain at least one digit. |
+| BR-RO-030 | A document in a currency other than RON must also state its VAT in RON (BT-6 and BT-111). |
+| BR-IC-11 / 12 | An intra-community supply must state the delivery date or the invoicing period, **and** the delivery country. |
+| BR-RO-A020 / A051 / A052 / A500 | Caps on repeating groups: 20 notes, 50 supporting documents, 50 item attributes, 500 preceding references. |
+
+The Schematron defines 97 `BR-RO-*` rules in total. What the library implements, and what it does
+not, is tracked as its own issue.
+
+### What the offline validator cannot check
+
+`ROeFacturaValidator.jar` demands a Romanian buyer CUI unconditionally, and rejects any invoice
+without one with `nu a fost identificat cui cumparator`. The live API handles that case through the
+`extern=DA` upload parameter, which a local file cannot carry — so **every export and
+intra-community invoice fails the offline validator while being perfectly legal**. The oracle suite
+pins this behaviour rather than working around it, so that a future validator release which fixes
+it is noticed.
+
 ## Open questions
 
 | Question | Resolved by |
 |---|---|
 | Scope of the daily quotas — per-id, per-CIF, or per-application | M8 |
 | Real-world timing of `in prelucrare` → `ok`, to calibrate the reconciler's backoff | M8 |
+| Whether the RASP message shape above is what ANAF actually accepts | M8 |
+| Whether `extern=DA` makes the live service accept a foreign-buyer invoice the offline validator refuses | M8 |

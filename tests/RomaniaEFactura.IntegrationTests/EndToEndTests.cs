@@ -317,7 +317,7 @@ public class EndToEndTests(MockAnafFixture fixture) : IClassFixture<MockAnafFixt
             IssueDate = new DateTime(2026, 8, 31),
             DueDate = new DateTime(2026, 9, 30),
             DocumentCurrencyCode = "RON",
-            AccountingSupplierParty = new PartyWrapper(Party("Furnizor E2E SRL", Cif, "RO-B", "BUCURESTI")),
+            AccountingSupplierParty = new PartyWrapper(Party("Furnizor E2E SRL", Cif, "RO-B", "SECTOR1")),
             AccountingCustomerParty = new PartyWrapper(Party("Client E2E SRL", "23456783", "RO-CJ", "CLUJ-NAPOCA")),
             TaxTotals =
             [
@@ -379,18 +379,4 @@ public class EndToEndTests(MockAnafFixture fixture) : IClassFixture<MockAnafFixt
         },
     };
 
-    private sealed class MockHttpClientFactory(MockAnafFixture fixture) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => fixture.CreateClient();
-    }
-
-    /// <summary>A clock the test moves by hand, so a simulated day takes milliseconds.</summary>
-    private sealed class TestClock(DateTimeOffset start) : TimeProvider
-    {
-        private DateTimeOffset _now = start;
-
-        public override DateTimeOffset GetUtcNow() => _now;
-
-        public void Advance(TimeSpan by) => _now = _now.Add(by);
-    }
 }

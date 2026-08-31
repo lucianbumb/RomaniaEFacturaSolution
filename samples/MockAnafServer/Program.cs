@@ -395,6 +395,16 @@ static void MapControl(RouteGroupBuilder group)
         return Results.Ok(new { pollsBeforeResolution = count });
     });
 
+    // Lets a test assert what was actually sent, rather than only that the call succeeded. The
+    // standard parameter is easy to get wrong and ANAF's failure for it is unhelpfully generic.
+    group.MapGet("/last-upload", (MockAnafState state) =>
+    {
+        var upload = state.LastUpload();
+        return upload is null
+            ? Results.NotFound(new { message = "No upload has been received." })
+            : Results.Ok(new { upload.IndexIncarcare, upload.Cif, upload.Standard, upload.Xml });
+    });
+
     group.MapPost("/messages", (IncomingMessageRequest body, MockAnafState state) =>
     {
         var message = state.AddIncomingMessage(
