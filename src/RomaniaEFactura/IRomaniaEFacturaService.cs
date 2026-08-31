@@ -142,8 +142,15 @@ public interface IRomaniaEFacturaService
     /// Reads what the reconciler has already established rather than calling ANAF, so it is free
     /// to call as often as a page needs and cannot exhaust the daily allowance.
     /// </remarks>
+    /// <param name="uploadIndex">ANAF's <c>index_incarcare</c>.</param>
+    /// <param name="cif">
+    /// Whose submission it is. One belonging to another company is not returned, so an application
+    /// serving several cannot be made to hand one over by naming its index.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<SubmissionStatus?> GetSubmissionAsync(
         string uploadIndex,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Lists recent submissions for a company, newest first.</summary>
@@ -180,26 +187,44 @@ public interface IRomaniaEFacturaService
     /// debit note, a validation error report, or a buyer message — so the result is discriminated
     /// rather than assumed.
     /// </remarks>
+    /// <param name="downloadId">ANAF's download identifier.</param>
+    /// <param name="cif">Whose message it is. See <see cref="GetArchiveAsync"/>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<AnafResult<EFacturaDocument>> GetDocumentAsync(
         string downloadId,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns a message's raw archive, holding the document and the ministry's signature.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Served from local storage when it has already been fetched, so repeated access does not
     /// spend the daily download allowance.
+    /// </para>
+    /// <para>
+    /// Which is why <paramref name="cif"/> matters. ANAF enforces rights on a download, but a
+    /// cached archive never reaches ANAF, so the check happens here or not at all.
+    /// </para>
     /// </remarks>
+    /// <param name="downloadId">ANAF's download identifier.</param>
+    /// <param name="cif">Whose message it is, defaulting to the configured company.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<AnafResult<byte[]>> GetArchiveAsync(
         string downloadId,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 
     // ------------------------------------------------------------------ utility
 
     /// <summary>Renders a document to PDF using ANAF's converter.</summary>
+    /// <param name="downloadId">ANAF's download identifier.</param>
+    /// <param name="cif">Whose message it is. See <see cref="GetArchiveAsync"/>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
     Task<AnafResult<byte[]>> RenderPdfAsync(
         string downloadId,
+        string? cif = null,
         CancellationToken cancellationToken = default);
 }
 

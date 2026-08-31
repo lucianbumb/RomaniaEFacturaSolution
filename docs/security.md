@@ -156,6 +156,32 @@ That ordering is load-bearing and easy to reverse by accident, so it is measured
 argued: `CompanyGateTests.AnUnauthorizedCompanyLeavesNoTrace` drives fifty unauthorized companies
 and asserts the dictionary is unchanged.
 
+## Serving several companies from one deployment
+
+The per-call `cif` override exists so one deployment can serve several companies. They share one
+database, so **every lookup by identifier is scoped by company**:
+
+```csharp
+await efactura.GetArchiveAsync(downloadId, cif: theTenantsCif);
+await efactura.GetDocumentAsync(downloadId, cif: theTenantsCif);
+await efactura.RenderPdfAsync(downloadId, cif: theTenantsCif);
+await efactura.GetSubmissionAsync(uploadIndex, cif: theTenantsCif);
+```
+
+Omit the CIF and the configured one is used, which is what a single-tenant deployment wants and
+leaves it unaffected.
+
+The scoping has to be local, and this is the part worth understanding. ANAF enforces rights on a
+download, so asking it for another company's document is refused — but the library **caches
+archives on purpose**, because downloads are capped at roughly ten per identifier per day, and a
+cached archive never reaches ANAF. Whatever check exists happens in the local query or it does not
+happen at all. ANAF's download identifiers are short numeric strings, so enumerating them is no
+obstacle.
+
+If your application has no configured CIF and passes one on every call, these methods will throw
+rather than guess. That is deliberate: an application serving several companies has to say whose
+document it is asking for.
+
 ## What the library already does
 
 - **Tokens are encrypted at rest** with `IDataProtector`, under a versioned purpose string, and a

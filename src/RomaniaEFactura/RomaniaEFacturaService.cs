@@ -222,11 +222,13 @@ public sealed class RomaniaEFacturaService(
 
     /// <inheritdoc />
     public async Task<SubmissionStatus?> GetSubmissionAsync(
-        string uploadIndex, CancellationToken cancellationToken = default)
+        string uploadIndex, string? cif = null, CancellationToken cancellationToken = default)
     {
+        var company = ResolveCif(cif);
+
         var row = await db.Submissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UploadIndex == uploadIndex, cancellationToken)
+            .FirstOrDefaultAsync(s => s.UploadIndex == uploadIndex && s.Cif == company, cancellationToken)
             .ConfigureAwait(false);
 
         return row is null ? null : ToStatus(row);
@@ -351,25 +353,33 @@ public sealed class RomaniaEFacturaService(
 
     /// <inheritdoc />
     public async Task<AnafResult<byte[]>> GetArchiveAsync(
-        string downloadId, CancellationToken cancellationToken = default)
+        string downloadId, string? cif = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(downloadId);
+
+        // Scoped by company, which is the whole reason this method takes a CIF. ANAF enforces
+        // rights on a download, so asking it for another company's document is refused — but a
+        // cached archive never reaches ANAF, and the local store is shared by every company the
+        // deployment serves.
+        var company = ResolveCif(cif);
 
         // Served locally where possible: downloads are capped at roughly ten per identifier per
         // day, so re-fetching something already held could deny an allowance to a message that
         // has never been retrieved.
         var stored = await db.InboxMessages
-            .FirstOrDefaultAsync(m => m.DownloadId == downloadId, cancellationToken)
+            .FirstOrDefaultAsync(m => m.DownloadId == downloadId && m.Cif == company, cancellationToken)
             .ConfigureAwait(false);
 
         if (stored?.Archive is { } cached) return AnafResult<byte[]>.Success(cached);
 
         var submission = await db.Submissions
-            .FirstOrDefaultAsync(s => s.DownloadId == downloadId, cancellationToken)
+            .FirstOrDefaultAsync(s => s.DownloadId == downloadId && s.Cif == company, cancellationToken)
             .ConfigureAwait(false);
 
         if (submission?.Archive is { } fromSubmission) return AnafResult<byte[]>.Success(fromSubmission);
 
+        // Nothing held for this company. Asking ANAF is still safe for an identifier belonging to
+        // another: it refuses a download the account has no rights on, which arrives as NoRights.
         var downloaded = await api.DownloadArchiveAsync(downloadId, cancellationToken).ConfigureAwait(false);
         if (!downloaded.IsSuccess) return downloaded;
 
@@ -384,9 +394,9 @@ public sealed class RomaniaEFacturaService(
 
     /// <inheritdoc />
     public async Task<AnafResult<EFacturaDocument>> GetDocumentAsync(
-        string downloadId, CancellationToken cancellationToken = default)
+        string downloadId, string? cif = null, CancellationToken cancellationToken = default)
     {
-        var archive = await GetArchiveAsync(downloadId, cancellationToken).ConfigureAwait(false);
+        var archive = await GetArchiveAsync(downloadId, cif, cancellationToken).ConfigureAwait(false);
         if (!archive.IsSuccess) return archive.CarryError<EFacturaDocument>();
 
         try
@@ -404,9 +414,9 @@ public sealed class RomaniaEFacturaService(
 
     /// <inheritdoc />
     public async Task<AnafResult<byte[]>> RenderPdfAsync(
-        string downloadId, CancellationToken cancellationToken = default)
+        string downloadId, string? cif = null, CancellationToken cancellationToken = default)
     {
-        var document = await GetDocumentAsync(downloadId, cancellationToken).ConfigureAwait(false);
+        var document = await GetDocumentAsync(downloadId, cif, cancellationToken).ConfigureAwait(false);
         if (!document.IsSuccess) return document.CarryError<byte[]>();
 
         // Some archives already carry a rendering, which saves a call entirely.
