@@ -178,6 +178,12 @@ cached archive never reaches ANAF. Whatever check exists happens in the local qu
 happen at all. ANAF's download identifiers are short numeric strings, so enumerating them is no
 obstacle.
 
+The same CIF decides **which stored authorization the ANAF call is made with** when nothing is
+held locally, and the reconciler polls each submission as the company that made it. Without that,
+a deployment serving several companies polled every submission with one account: ANAF answers
+`NoRights`, the submission is retried on its widening schedule and never settles, and the log reads
+as misconfiguration rather than as a bug.
+
 If your application has no configured CIF and passes one on every call, these methods will throw
 rather than guess. That is deliberate: an application serving several companies has to say whose
 document it is asking for.

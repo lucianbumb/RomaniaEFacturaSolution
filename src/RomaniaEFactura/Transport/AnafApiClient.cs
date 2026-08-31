@@ -115,13 +115,14 @@ public sealed class AnafApiClient : IAnafApiClient
     /// <inheritdoc />
     public async Task<AnafResult<MessageStatus>> GetStatusAsync(
         string uploadIndex,
+        string? cif = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(uploadIndex);
 
         var query = new Dictionary<string, string?> { ["id_incarcare"] = uploadIndex };
         var result = await SendAsync(
-            ResolveCif(null),
+            ResolveCif(cif),
             () => new HttpRequestMessage(HttpMethod.Get, BuildUri("stareMesaj", query)),
             cancellationToken).ConfigureAwait(false);
 
@@ -242,13 +243,14 @@ public sealed class AnafApiClient : IAnafApiClient
     /// <inheritdoc />
     public async Task<AnafResult<byte[]>> DownloadArchiveAsync(
         string downloadId,
+        string? cif = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(downloadId);
 
         var query = new Dictionary<string, string?> { ["id"] = downloadId };
         var result = await SendAsync(
-            ResolveCif(null),
+            ResolveCif(cif),
             () => new HttpRequestMessage(HttpMethod.Get, BuildUri("descarcare", query)),
             cancellationToken).ConfigureAwait(false);
 
