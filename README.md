@@ -9,13 +9,19 @@ what arrives, and validate against CIUS-RO before anything leaves your machine.
 
 ## The guarantee
 
-**If it compiles and `Verify()` returns valid, ANAF will never reject the document for format
-reasons.**
+**Fill in an `InvoiceEditModel`, let `Verify()` accept it, and ANAF will not reject the document
+for format reasons.**
 
 Validation runs fully offline — a C# port of the CIUS-RO rules, checked in tests against ANAF's
-own validator. Everything that genuinely can fail at runtime (nobody has authorized this CIF yet,
-the token expired, ANAF is down, rate limited, no SPV rights) comes back as a typed result you
-branch on, not an exception you discover in production.
+own validator over a corpus of valid and deliberately-invalid documents. Everything that genuinely
+can fail at runtime (nobody has authorized this CIF yet, the token expired, ANAF is down, rate
+limited, no SPV rights) comes back as a typed result you branch on, not an exception you discover
+in production.
+
+The guarantee is stated for the edit models deliberately. `Verify(UblInvoice)` — the path for
+callers who build UBL directly — runs the same engine, but a UBL document can express things the
+edit models cannot, and the rule port is not yet complete for those
+([#18](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/18)).
 
 ## Intended usage
 
@@ -43,8 +49,14 @@ public class InvoicePage(IRomaniaEFacturaService efactura)
 }
 ```
 
-`InvoiceEditModel` carries its own validation rules, so ASP.NET model binding and Blazor
-`EditForm` pick them up with no extra wiring.
+`InvoiceEditModel` carries its own validation rules, so ASP.NET Core model binding picks them up
+with no extra wiring. In Blazor, use the `<EFacturaValidator />` component in place of
+`<DataAnnotationsValidator />` — the built-in one validates the model object and stops, which would
+leave every invoice line unchecked. See [docs/edit-models.md](docs/edit-models.md).
+
+It also computes what EN16931 makes you state and then checks: line net amounts, the seven document
+totals, and the VAT breakdown. You enter quantities and prices; the arithmetic rules become
+impossible to fail rather than merely caught.
 
 ## Repository layout
 
@@ -55,6 +67,7 @@ public class InvoicePage(IRomaniaEFacturaService efactura)
 | `tests/RomaniaEFactura.IntegrationTests` | Full lifecycle against the mock server |
 | `samples/MockAnafServer` | A local stand-in for ANAF, so everything is testable without credentials |
 | `samples/SampleWebApp` | Blazor Server app exercising every method — doubles as documentation |
+| `docs/edit-models.md` | Filling in an invoice: what the model derives, and the Romanian rules that surprise |
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
 | `documentation_efactura/` | ANAF's own published specifications |
 

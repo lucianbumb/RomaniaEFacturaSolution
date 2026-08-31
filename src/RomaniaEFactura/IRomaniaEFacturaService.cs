@@ -226,6 +226,11 @@ public sealed record SubmissionReceipt(string UploadIndex, string Cif, DateTimeO
 /// <param name="ResolvedAt">When the outcome became known.</param>
 /// <param name="HasArchive">Whether the signed response has been retrieved and stored.</param>
 /// <param name="LastError">The most recent problem, if the reconciler hit one.</param>
+/// <param name="NextPollAt">
+/// When ANAF will next be asked about this submission. Worth showing beside a pending document:
+/// the schedule widens deliberately to stay inside the daily allowance, so a page that offers to
+/// reconcile on demand needs to explain why nothing happened when nothing was due.
+/// </param>
 public sealed record SubmissionStatus(
     string UploadIndex,
     string Cif,
@@ -234,7 +239,8 @@ public sealed record SubmissionStatus(
     DateTimeOffset SubmittedAt,
     DateTimeOffset? ResolvedAt,
     bool HasArchive,
-    string? LastError)
+    string? LastError,
+    DateTimeOffset NextPollAt)
 {
     /// <summary>Whether ANAF accepted the document and it reached the buyer.</summary>
     public bool IsAccepted => State == UploadState.Ok;

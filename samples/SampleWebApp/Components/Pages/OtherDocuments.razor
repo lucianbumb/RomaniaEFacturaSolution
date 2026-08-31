@@ -1,0 +1,116 @@
+@page "/other"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+@inject NavigationManager Navigation
+
+<PageTitle>Credit notes and messages</PageTitle>
+
+<h1>Credit notes, buyer messages and raw XML</h1>
+
+<h2 class="h4 mt-4">Credit note</h2>
+<p class="text-secondary">
+    Same shape as an invoice, with two differences the model enforces: it must reference the
+    invoice it corrects, and its quantities are stated <em>positive</em> — the document is already
+    a credit, so entering negatives credits the wrong way round.
+</p>
+
+<EditForm Model="_creditNote" OnValidSubmit="SendCreditNoteAsync" FormName="credit-note">
+    <EFacturaValidator />
+    <div class="row g-2" style="max-width: 46rem;">
+        <div class="col-md-4">
+            <label class="form-label">Number</label>
+            <InputText class="form-control" @bind-Value="_creditNote.Number" />
+            <ValidationMessage For="() => _creditNote.Number" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Corrects invoice</label>
+            <InputText class="form-control" @bind-Value="_creditNote.PrecedingDocuments[0].Number" />
+            <ValidationMessage For="() => _creditNote.PrecedingDocuments" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Amount credited</label>
+            <InputNumber class="form-control" @bind-Value="_creditNote.Lines[0].UnitPrice" />
+        </div>
+    </div>
+    <p class="text-secondary small mt-2">Total with VAT: @_creditNote.TaxInclusiveTotal.ToString("N2")</p>
+    <button type="submit" class="btn btn-primary" disabled="@_busy">Send credit note</button>
+</EditForm>
+
+<h2 class="h4 mt-5">Buyer message (RASP)</h2>
+<p class="text-secondary">
+    How a buyer disputes an invoice inside e-Factura rather than by email. Note the caveat in the
+    documentation: this is the one wire format ANAF does not publish a schema for, so its shape is
+    corroborated rather than confirmed.
+</p>
+
+<EditForm Model="_message" OnValidSubmit="SendMessageAsync" FormName="buyer-message">
+    <EFacturaValidator />
+    <div class="row g-2" style="max-width: 46rem;">
+        <div class="col-md-4">
+            <label class="form-label">Invoice upload index</label>
+            <InputText class="form-control" @bind-Value="_message.UploadIndex" />
+            <ValidationMessage For="() => _message.UploadIndex" />
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">Message</label>
+            <InputText class="form-control" @bind-Value="_message.Message" />
+            <ValidationMessage For="() => _message.Message" />
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-2" disabled="@_busy">Send message</button>
+</EditForm>
+
+<h2 class="h4 mt-5">Raw XML</h2>
+<p class="text-secondary">
+    The escape hatch, for anything the models cannot express — a foreign-currency invoice, a tax
+    representative, a CII document. <strong>Deliberately unverified:</strong> the promise that ANAF
+    will accept the format does not extend to this path.
+</p>
+
+<textarea class="form-control font-monospace" rows="6" @bind="_rawXml"
+          placeholder="<Invoice xmlns=...>"></textarea>
+@* Disabled while empty, because SendRawXmlAsync throws on blank input rather than returning a
+   result: sending nothing is a programming error, not an outcome to branch on. A form that can
+   reach it takes down the circuit, which is what happened the first time this page was walked. *@
+<button class="btn btn-outline-danger mt-2" @onclick="SendRawAsync"
+        disabled="@(_busy || string.IsNullOrWhiteSpace(_rawXml))">
+    Send without verifying
+</button>
+
+@if (_result is not null)
+{
+    <div class="alert @(_result.Value.Success ? "alert-success" : "alert-danger") mt-3">
+        @_result.Value.Text
+    </div>
+}
+
+@code {
+    private CreditNoteEditModel _creditNote = SampleInvoices.BlankCreditNote();
+    private BuyerMessageEditModel _message = new() { UploadIndex = "3828", Message = "Cantitatea livrata nu corespunde comenzii." };
+    private string _rawXml = string.Empty;
+    private (bool Success, string Text)? _result;
+    private bool _busy;
+
+    private async Task SendCreditNoteAsync() =>
+        await RunAsync(() => EFactura.SendCreditNoteAsync(_creditNote));
+
+    private async Task SendMessageAsync() =>
+        await RunAsync(() => EFactura.SendBuyerMessageAsync(_message));
+
+    private async Task SendRawAsync() =>
+        await RunAsync(() => EFactura.SendRawXmlAsync(_rawXml));
+
+    private async Task RunAsync(Func<Task<AnafResult<SubmissionReceipt>>> send)
+    {
+        _busy = true;
+        _result = null;
+
+        var result = await send();
+
+        _result = result.IsSuccess
+            ? (true, $"Accepted. ANAF index {result.Value.UploadIndex}.")
+            : (false, $"{result.Error!.Message} ({result.Error.Kind})");
+
+        _busy = false;
+    }
+}

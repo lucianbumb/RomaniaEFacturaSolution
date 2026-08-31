@@ -1,0 +1,96 @@
+@page "/inbox"
+@rendermode InteractiveServer
+@inject IRomaniaEFacturaService EFactura
+
+<PageTitle>Inbox</PageTitle>
+
+<h1>Inbox</h1>
+
+<p class="text-secondary">
+    Messages ANAF has for this company. Sync resumes from a stored watermark and skips anything
+    already held, because a download costs one of about ten calls a day per identifier — re-fetching
+    something already stored could deny an allowance to a message never retrieved.
+</p>
+
+<button class="btn btn-primary mb-3" @onclick="SyncAsync" disabled="@_busy">Sync with ANAF</button>
+
+@if (_syncError is not null)
+{
+    <div class="alert alert-danger">@_syncError.Message <code>@_syncError.Kind</code></div>
+}
+else if (_sync is not null)
+{
+    <div class="alert alert-info">
+        @_sync.NewMessages new, @_sync.AlreadyKnown already held. Synced up to
+        @_sync.SyncedUpTo.LocalDateTime.ToString("G").
+    </div>
+}
+
+<div class="mb-3">
+    <label class="form-label me-2">Show</label>
+    <select class="form-select d-inline-block w-auto" @bind="_filter">
+        <option value="all">Everything</option>
+        <option value="received">Received invoices</option>
+        <option value="errors">Validation errors</option>
+    </select>
+</div>
+
+@if (_messages is null)
+{
+    <p><em>Loading&hellip;</em></p>
+}
+else if (Filtered().Count == 0)
+{
+    <p class="text-secondary">Nothing to show. "Nu exista mesaje" from ANAF means empty, not failure.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Created</th><th>Type</th><th>Supplier</th><th>Download id</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var message in Filtered())
+            {
+                <tr class="@(message.IsError ? "table-warning" : null)">
+                    <td>@(message.CreatedAt?.LocalDateTime.ToString("g") ?? "—")</td>
+                    <td>@message.Type</td>
+                    <td>@(message.SupplierCif ?? "—")</td>
+                    <td><code>@message.DownloadId</code></td>
+                    <td><a href="/documents/@message.DownloadId">Open</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<InboxMessage>? _messages;
+    private InboxSyncResult? _sync;
+    private AnafError? _syncError;
+    private string _filter = "all";
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _messages = await EFactura.GetInboxAsync();
+
+    private async Task SyncAsync()
+    {
+        _busy = true;
+        _syncError = null;
+
+        var result = await EFactura.SyncInboxAsync();
+        if (result.IsSuccess) _sync = result.Value; else _syncError = result.Error;
+
+        _busy = false;
+        await LoadAsync();
+    }
+
+    private IReadOnlyList<InboxMessage> Filtered() => _filter switch
+    {
+        "errors" => [.. _messages!.Where(m => m.IsError)],
+        "received" => [.. _messages!.Where(m => !m.IsError)],
+        _ => _messages!,
+    };
+}

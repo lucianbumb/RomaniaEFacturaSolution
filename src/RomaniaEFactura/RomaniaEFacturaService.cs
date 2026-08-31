@@ -424,7 +424,7 @@ public sealed class RomaniaEFacturaService(
 
     private static SubmissionStatus ToStatus(EFacturaSubmission s) => new(
         s.UploadIndex, s.Cif, s.DocumentId, s.State, s.SubmittedAt, s.ResolvedAt,
-        s.Archive != null, s.LastError);
+        s.Archive != null, s.LastError, s.NextPollAt);
 
     /// <summary>
     /// Turns a failed offline validation into a result, so a caller handles it the same way as any
