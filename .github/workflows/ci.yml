@@ -30,6 +30,36 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # The CIUS-RO oracle tests run ANAF's own validator, which is a Java program. The archive
+      # bundles a Windows-only JRE, so Linux needs its own JDK; AnafValidator falls back to
+      # whatever `java` is on PATH when the bundled runtime is not usable.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache ANAF validator
+        id: cache-validator
+        uses: actions/cache@v4
+        with:
+          path: tools/roefacturavalidator
+          key: roefacturavalidator-12122024
+
+      - name: Download ANAF validator
+        if: steps.cache-validator.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p tools
+          curl -sSfL --retry 3 \
+            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36" \
+            -o validator.zip \
+            https://mfinante.gov.ro/static/10/eFactura/roefacturavalidator_12122024.zip
+          unzip -q validator.zip -d tools/roefacturavalidator
+          # The archive may nest everything one level deep; normalise so the jar sits at the root.
+          if [ ! -f tools/roefacturavalidator/ROeFacturaValidator.jar ]; then
+            inner=$(dirname "$(find tools/roefacturavalidator -name ROeFacturaValidator.jar | head -1)")
+            mv "$inner"/* tools/roefacturavalidator/
+          fi
+
       - name: Restore
         run: dotnet restore RomaniaEFacturaSolution.sln
 
@@ -37,7 +67,26 @@ jobs:
         run: dotnet build RomaniaEFacturaSolution.sln --no-restore --configuration Release
 
       - name: Test
+        env:
+          ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
         run: dotnet test RomaniaEFacturaSolution.sln --no-build --configuration Release --verbosity normal
+
+      # The oracle tests skip silently when the validator is missing, which would quietly turn the
+      # comparison against ANAF's authority into a no-op. Fail the build instead.
+      - name: Assert the oracle actually ran
+        env:
+          ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
+        run: |
+          if [ ! -f "$ROEFACTURA_VALIDATOR_HOME/ROeFacturaValidator.jar" ]; then
+            echo "::error::ANAF validator missing; the CIUS-RO oracle tests would have been skipped"
+            exit 1
+          fi
+          dotnet test tests/RomaniaEFactura.Tests --no-build --configuration Release \
+            --filter "FullyQualifiedName~Oracle" --verbosity normal | tee oracle.txt
+          if grep -qE "Skipped:[[:space:]]*[1-9]" oracle.txt; then
+            echo "::error::CIUS-RO oracle tests were skipped"
+            exit 1
+          fi
 
       - name: Fail on vulnerable packages
         run: |
