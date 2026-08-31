@@ -57,8 +57,30 @@ public class OptionsValidationTests
     [Fact]
     public void ARelativeRedirectUriIsRefused()
     {
+        // Platform-dependent, which is how CI found the hole this guards. On Unix a leading slash
+        // parses as an absolute file:// URI, so this reaches the scheme check rather than the
+        // absolute-URI check — hence asserting only that it is refused, and naming the setting.
         Assert.Contains(
-            "absolute", Refused(o => o.RedirectUri = "/efactura/callback"), StringComparison.Ordinal);
+            "RedirectUri", Refused(o => o.RedirectUri = "/efactura/callback"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("file:///efactura/callback")]
+    [InlineData("ftp://app.example.ro/efactura/callback")]
+    public void ARedirectUriThatIsNotHttpIsRefused(string uri)
+    {
+        // file:// is the one that matters: Uri.IsLoopback is true for it, so a check written as
+        // "https or loopback" without a scheme test lets every file:// address through.
+        Assert.Contains("RedirectUri", Refused(o => o.RedirectUri = uri), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ABaseAddressThatIsNotHttpIsRefused()
+    {
+        Assert.Contains(
+            "ApiBaseAddress",
+            Refused(o => o.ApiBaseAddress = new Uri("file:///tmp/anaf")),
+            StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------- carrying secrets

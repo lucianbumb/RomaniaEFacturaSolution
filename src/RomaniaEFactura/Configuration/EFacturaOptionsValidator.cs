@@ -127,10 +127,23 @@ internal sealed class EFacturaOptionsValidator : IValidateOptions<EFacturaOption
     /// Whether an address may carry a credential.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Loopback is the seam rather than a blanket https requirement, because pointing the library
     /// at the mock server is a supported and necessary thing to do — and a loopback address is not
     /// reachable from off the machine, so there is no transit to protect.
+    /// </para>
+    /// <para>
+    /// The scheme is checked first, and that is not tidiness. <c>Uri.IsLoopback</c> is
+    /// <see langword="true"/> for a <c>file://</c> URI, and on Unix a leading slash parses as one:
+    /// <c>Uri.TryCreate("/efactura/callback", UriKind.Absolute, ...)</c> succeeds there and fails
+    /// on Windows. Without this line a relative redirect URI — and any <c>file://</c> address —
+    /// would be accepted on Linux and refused on Windows, which is how CI found it.
+    /// </para>
     /// </remarks>
-    private static bool IsSecureOrLoopback(Uri address) =>
-        address.Scheme == Uri.UriSchemeHttps || address.IsLoopback;
+    private static bool IsSecureOrLoopback(Uri address)
+    {
+        if (address.Scheme != Uri.UriSchemeHttps && address.Scheme != Uri.UriSchemeHttp) return false;
+
+        return address.Scheme == Uri.UriSchemeHttps || address.IsLoopback;
+    }
 }
