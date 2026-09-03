@@ -86,7 +86,12 @@ public sealed class AnafCompanyLookupClient(
         ArgumentNullException.ThrowIfNull(cuis);
 
         var asOf = on ?? DateOnly.FromDateTime(Clock().UtcDateTime);
+
+        // A set alongside the list, rather than List.Contains inside the loop. The batching this
+        // method exists for means a caller may pass thousands of codes, and a linear scan per code
+        // is quadratic before a single request is sent.
         var normalised = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var cui in cuis)
         {
             var value = RomanianCif.Normalize(cui);
@@ -101,7 +106,7 @@ public sealed class AnafCompanyLookupClient(
                     nameof(cuis));
             }
 
-            if (!normalised.Contains(value, StringComparer.Ordinal)) normalised.Add(value);
+            if (seen.Add(value)) normalised.Add(value);
         }
 
         if (normalised.Count == 0)

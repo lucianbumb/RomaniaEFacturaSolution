@@ -74,7 +74,7 @@ public static partial class EditModelValidator
         // Guards against a model that refers back to itself. Nothing here does today, but a caller
         // subclassing one of these types could, and a stack overflow is a poor way to find out.
         var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-        Walk(model, path: null, findings, visited);
+        Walk(model, path: null, findings, visited, new List<ValidationResult>());
         return findings;
     }
 
@@ -82,11 +82,12 @@ public static partial class EditModelValidator
         object model,
         string? path,
         List<ValidationFinding> findings,
-        HashSet<object> visited)
+        HashSet<object> visited,
+        List<ValidationResult> results)
     {
         if (!visited.Add(model)) return;
 
-        var results = new List<ValidationResult>();
+        results.Clear();
         var context = new ValidationContext(model);
 
         // validateAllProperties: true is what makes anything beyond [Required] run at all.
@@ -97,12 +98,8 @@ public static partial class EditModelValidator
             findings.Add(ToFinding(result, path));
         }
 
-        foreach (var property in model.GetType().GetProperties())
+        foreach (var property in WalkableProperties(model.GetType()))
         {
-            if (property.GetIndexParameters().Length > 0) continue;
-            if (!property.CanRead) continue;
-            if (!IsWorthWalking(property.PropertyType)) continue;
-
             object? value;
             try
             {
@@ -126,7 +123,7 @@ public static partial class EditModelValidator
                 {
                     if (item is not null && IsWorthWalking(item.GetType()))
                     {
-                        Walk(item, $"{childPath}[{index}]", findings, visited);
+                        Walk(item, $"{childPath}[{index}]", findings, visited, results);
                     }
 
                     index++;
@@ -134,10 +131,30 @@ public static partial class EditModelValidator
             }
             else
             {
-                Walk(value, childPath, findings, visited);
+                Walk(value, childPath, findings, visited, results);
             }
         }
     }
+
+    /// <summary>
+    /// The properties of a type worth walking into, worked out once.
+    /// </summary>
+    /// <remarks>
+    /// <c>Type.GetProperties()</c> allocates a fresh array on every call, and the filtering below
+    /// gives the same answer every time — the property set of a line does not differ between line 1
+    /// and line 200. On a 200-line invoice this ran four hundred times per validation, and the
+    /// Blazor validator revalidates on every field change.
+    /// </remarks>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, PropertyInfo[]> Walkable = new();
+
+    private static PropertyInfo[] WalkableProperties(Type type) =>
+        Walkable.GetOrAdd(type, static t =>
+        [
+            .. t.GetProperties()
+                .Where(p => p.GetIndexParameters().Length == 0)
+                .Where(p => p.CanRead)
+                .Where(p => IsWorthWalking(p.PropertyType)),
+        ]);
 
     /// <summary>
     /// Whether a type can carry validation rules worth recursing into.

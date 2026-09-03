@@ -95,6 +95,33 @@ public class InboxSweepTests(MockAnafFixture fixture) : IClassFixture<MockAnafFi
         Assert.Equal(0, second.Added);
     }
 
+    [Fact]
+    public async Task AMessageResolvedThroughStareMesajIsNotRecordedTwice()
+    {
+        // Some messages carry only an id_solicitare, and their download identifier is discovered a
+        // call later. The inbox sync asks the database which of the listed identifiers it already
+        // holds - and this one is not in that listing, so it needs its own check. Without one, a
+        // second sync inserts it again and collides on the primary key.
+        using var host = await BuildAsync(authorized: [Ours]);
+        await fixture.SeedIncomingMessageAsync(SampleInvoiceXml, hideId: true);
+
+        var first = await Sweeper(host).RunOnceAsync();
+
+        // The watermark alone would hide this: a second sweep lists only what arrived since, so the
+        // message would not come back and nothing would be re-inserted. Rewinding it forces the
+        // overlap the known-identifier set exists for, which is the only way this path is reached.
+        await RewindCursorsAsync(host, by: TimeSpan.FromDays(1));
+        var second = await Sweeper(host).RunOnceAsync();
+
+        Assert.Equal(1, first.Added);
+        Assert.Equal(0, second.Added);
+        Assert.Equal(0, second.Failed);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EFacturaDbContext>();
+        Assert.Single(await db.InboxMessages.Where(m => m.Cif == Ours).ToListAsync());
+    }
+
     // ------------------------------------------------------- when it goes wrong
 
     [Fact]
@@ -142,6 +169,27 @@ public class InboxSweepTests(MockAnafFixture fixture) : IClassFixture<MockAnafFi
     // ------------------------------------------------------------- the harness
 
     private static InboxSweeper Sweeper(IHost host) => host.Services.GetRequiredService<InboxSweeper>();
+
+    /// <summary>
+    /// Moves the watermark back, so the next sweep lists messages it has already recorded.
+    /// </summary>
+    /// <remarks>
+    /// Overlap is what the known-identifier set guards against, and the watermark normally prevents
+    /// it — so a test of that guard has to create the overlap deliberately.
+    /// </remarks>
+    private static async Task RewindCursorsAsync(IHost host, TimeSpan by)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EFacturaDbContext>();
+
+        foreach (var cursor in await db.InboxCursors.ToListAsync())
+        {
+            cursor.SyncedUpTo -= by;
+            cursor.NextSyncAt -= by;
+        }
+
+        await db.SaveChangesAsync();
+    }
 
     /// <summary>Moves every cursor's next-due time into the past, as elapsed time would.</summary>
     private static async Task AgeCursorsAsync(IHost host, TimeSpan by)
