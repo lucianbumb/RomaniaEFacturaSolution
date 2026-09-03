@@ -115,6 +115,7 @@ See [docs/multi-tenancy.md](docs/multi-tenancy.md).
 | `docs/security.md` | What the library protects, what the host application owns, and why |
 | `docs/multi-tenancy.md` | Serving several companies from one deployment |
 | `docs/company-lookup.md` | Asking ANAF about a company before invoicing it |
+| `docs/persistence.md` | The library's own tables, providers tested, and migrations |
 | `documentation_efactura/` | ANAF's own published specifications |
 
 ## Contributing
