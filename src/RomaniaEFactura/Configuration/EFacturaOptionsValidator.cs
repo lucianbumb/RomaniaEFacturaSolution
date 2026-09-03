@@ -65,6 +65,13 @@ internal sealed class EFacturaOptionsValidator : IValidateOptions<EFacturaOption
         ValidateBaseAddress(options.ApiBaseAddress, nameof(EFacturaOptions.ApiBaseAddress), failures);
         ValidateBaseAddress(options.OAuthBaseAddress, nameof(EFacturaOptions.OAuthBaseAddress), failures);
 
+        // Held to the same rule as the other two, though it carries no token. What comes back
+        // decides whether a document is addressed as B2B or through uploadb2c, and whether a VAT
+        // identifier belongs on it - so anyone able to answer this request can make an application
+        // send documents the wrong way.
+        ValidateBaseAddress(
+            options.CompanyLookupBaseAddress, nameof(EFacturaOptions.CompanyLookupBaseAddress), failures);
+
         if (options.Timeout <= TimeSpan.Zero)
         {
             failures.Add("EFactura:Timeout must be positive.");
@@ -135,9 +142,11 @@ internal sealed class EFacturaOptionsValidator : IValidateOptions<EFacturaOption
         if (!IsSecureOrLoopback(address))
         {
             failures.Add(
-                $"EFactura:{setting} '{address}' is not https. Every call to it carries the bearer "
-                + "token, and the OAuth address carries the client secret as well. Override it with "
-                + "a plaintext address only against a loopback host, which is what the mock server is.");
+                $"EFactura:{setting} '{address}' is not https. The API and OAuth addresses carry the "
+                + "bearer token and the client secret; the company lookup carries no credential but "
+                + "its answer decides whether a document goes out as B2B or B2C. Override any of "
+                + "them with a plaintext address only against a loopback host, which is what the "
+                + "mock server is.");
         }
     }
 
