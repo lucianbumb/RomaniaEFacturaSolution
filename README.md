@@ -78,6 +78,20 @@ store, and an authorization left open to anonymous callers can be replaced by an
 own certificate. [docs/security.md](docs/security.md) explains what that costs and how to narrow
 access further.
 
+### Looking a company up
+
+ANAF's taxpayer register is a separate, unauthenticated service, so this works before anybody has
+connected a company:
+
+```csharp
+var result = await efactura.LookupCompanyAsync("RO12345674");
+if (result.IsSuccess && result.Value is { } company) invoice.Buyer = company.ToPartyEditModel();
+```
+
+It fills in the name and address, and answers the three questions that decide how a document is
+built: whether the company is in the **RO e-Factura register** (B2B or B2C), whether it is
+registered for VAT, and whether it is inactive. See [docs/company-lookup.md](docs/company-lookup.md).
+
 ### Serving several companies
 
 One deployment can serve many companies, each connecting its own authorization. Implement
@@ -100,6 +114,7 @@ See [docs/multi-tenancy.md](docs/multi-tenancy.md).
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
 | `docs/security.md` | What the library protects, what the host application owns, and why |
 | `docs/multi-tenancy.md` | Serving several companies from one deployment |
+| `docs/company-lookup.md` | Asking ANAF about a company before invoicing it |
 | `documentation_efactura/` | ANAF's own published specifications |
 
 ## Contributing

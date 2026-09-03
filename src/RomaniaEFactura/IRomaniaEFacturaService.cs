@@ -1,4 +1,5 @@
 using RomaniaEFactura.EditModels;
+using RomaniaEFactura.Lookup;
 using RomaniaEFactura.Transport;
 using RomaniaEFactura.Ubl;
 using RomaniaEFactura.Validation;
@@ -217,6 +218,47 @@ public interface IRomaniaEFacturaService
         CancellationToken cancellationToken = default);
 
     // ------------------------------------------------------------------ utility
+
+    /// <summary>
+    /// Looks a company up in ANAF's public taxpayer register.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A different service from the e-Factura API, needing no authorization — so this works before
+    /// anybody has connected a company, which is what makes it usable on a form.
+    /// </para>
+    /// <para>
+    /// Answers three questions a document depends on: whether the company is in the RO e-Factura
+    /// register, and so whether a document goes to it as B2B or B2C; whether it is registered for
+    /// VAT; and whether it is on the register of inactive taxpayers. It also fills in the name and
+    /// address, through <see cref="CompanyLookup.ToPartyEditModel"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="cui">The fiscal code, with or without the <c>RO</c> prefix.</param>
+    /// <param name="on">The date to ask about. Defaults to today.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The company, or null when the register does not know the code.</returns>
+    Task<AnafResult<CompanyLookup?>> LookupCompanyAsync(
+        string cui,
+        DateOnly? on = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Looks up many companies at once.
+    /// </summary>
+    /// <remarks>
+    /// The register accepts a hundred codes per request and one request per second, so asking
+    /// about a hundred companies together costs one call and asking individually costs a hundred
+    /// seconds. More than a hundred are batched and paced; the result carries both what was found
+    /// and what was not.
+    /// </remarks>
+    /// <param name="cuis">The fiscal codes.</param>
+    /// <param name="on">The date to ask about. Defaults to today.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    Task<AnafResult<CompanyLookupResult>> LookupCompaniesAsync(
+        IEnumerable<string> cuis,
+        DateOnly? on = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Renders a document to PDF using ANAF's converter.</summary>
     /// <param name="downloadId">ANAF's download identifier.</param>

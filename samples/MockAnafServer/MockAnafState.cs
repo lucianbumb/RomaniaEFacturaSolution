@@ -27,6 +27,42 @@ public sealed class MockAnafState
     /// <summary>The clock, overridable so tests can exercise the 60-day boundary.</summary>
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
 
+    /// <summary>
+    /// The taxpayer register, keyed by fiscal code.
+    /// </summary>
+    /// <remarks>
+    /// Seeded with a handful of companies covering the combinations that change how a document is
+    /// built: in the e-Factura register or not, VAT-registered or not, inactive or not. A test
+    /// adds its own through <c>/__mock/companies</c>.
+    /// </remarks>
+    public ConcurrentDictionary<string, RegisteredCompany> Companies { get; } = new(
+        StringComparer.Ordinal)
+    {
+        // The account under test: ordinary, active, VAT-registered, in the e-Factura register.
+        ["12345674"] = new RegisteredCompany(
+            "12345674", "SC TEST SRL", "J12/345/2001", "0264111222", "6201", "RO49AAAA1B31007593840000",
+            EFactura: true, Vat: true, Inactive: false,
+            "Strada Memorandumului", "28", "Cluj-Napoca", "Cluj", "CJ", "RO", "400114", "Etaj 2"),
+
+        // Not in the e-Factura register: a document to this one goes through uploadb2c.
+        ["19867705"] = new RegisteredCompany(
+            "19867705", "SC FARA EFACTURA SRL", "J40/999/2007", null, "4711", null,
+            EFactura: false, Vat: true, Inactive: false,
+            "Bulevardul Unirii", "12", "Bucuresti", "Bucuresti", "B", "RO", "030167", null),
+
+        // Not VAT-registered, so no BT-48 belongs on a document to it.
+        ["80000009"] = new RegisteredCompany(
+            "80000009", "SC NEPLATITOR TVA SRL", "J13/222/2015", null, "5610", null,
+            EFactura: true, Vat: false, Inactive: false,
+            "Strada Stefan cel Mare", "5", "Constanta", "Constanta", "CT", "RO", "900178", null),
+
+        // On the register of inactive taxpayers.
+        ["98765438"] = new RegisteredCompany(
+            "98765438", "SC INACTIVA SRL", "J22/111/2010", null, "4520", null,
+            EFactura: false, Vat: false, Inactive: true,
+            "Strada Lapusneanu", "3", "Iasi", "Iasi", "IS", "RO", "700057", null),
+    };
+
     /// <summary>Daily call cap for <c>stareMesaj</c>, per upload index.</summary>
     public int StatusQuotaPerDay { get; set; } = 20;
 
@@ -218,3 +254,40 @@ public sealed record MessageRecord(
     /// </summary>
     public bool HideId { get; set; }
 }
+
+/// <summary>A company as the mock's taxpayer register holds it.</summary>
+/// <param name="Cui">Fiscal code.</param>
+/// <param name="Name">Registered name.</param>
+/// <param name="RegistrationNumber">Commerce register number.</param>
+/// <param name="Phone">Telephone.</param>
+/// <param name="CaenCode">Principal activity code.</param>
+/// <param name="Iban">Bank account, when the register holds one.</param>
+/// <param name="EFactura">Whether it is in the RO e-Factura register.</param>
+/// <param name="Vat">Whether it is registered for VAT.</param>
+/// <param name="Inactive">Whether it is on the register of inactive taxpayers.</param>
+/// <param name="Street">Street name.</param>
+/// <param name="Number">Street number.</param>
+/// <param name="Locality">Town or city.</param>
+/// <param name="County">County name.</param>
+/// <param name="CountyCode">Two-letter county code.</param>
+/// <param name="Country">Country name.</param>
+/// <param name="PostalCode">Postal code.</param>
+/// <param name="Details">Further address detail.</param>
+public sealed record RegisteredCompany(
+    string Cui,
+    string Name,
+    string? RegistrationNumber,
+    string? Phone,
+    string? CaenCode,
+    string? Iban,
+    bool EFactura,
+    bool Vat,
+    bool Inactive,
+    string Street,
+    string Number,
+    string Locality,
+    string County,
+    string CountyCode,
+    string Country,
+    string PostalCode,
+    string? Details);

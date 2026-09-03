@@ -49,6 +49,15 @@ public sealed class EFacturaOptions
     /// <summary>Overrides the OAuth base address, for the same reason.</summary>
     public Uri? OAuthBaseAddress { get; set; }
 
+    /// <summary>
+    /// Overrides the address of ANAF's public taxpayer register.
+    /// </summary>
+    /// <remarks>
+    /// A different service on a different host from the e-Factura API, and unauthenticated, so it
+    /// has its own address rather than sharing one.
+    /// </remarks>
+    public Uri? CompanyLookupBaseAddress { get; set; }
+
     /// <summary>How long to wait for a single ANAF call.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(100);
 
@@ -121,4 +130,15 @@ public sealed class EFacturaOptions
     /// version's upload path unreachable, since it validated before every upload.
     /// </remarks>
     public Uri ResolvedPublicToolsBaseAddress => ApiBaseAddress ?? new Uri("https://webservicesp.anaf.ro/prod/FCTEL/rest");
+
+    /// <summary>
+    /// The address of ANAF's public taxpayer register actually in use.
+    /// </summary>
+    /// <remarks>
+    /// There is one register, not a test copy of it, so this does not vary by environment. It
+    /// falls back to <see cref="ApiBaseAddress"/> when that is overridden, which is what points
+    /// the lookup at the mock server alongside everything else.
+    /// </remarks>
+    public Uri ResolvedCompanyLookupBaseAddress =>
+        CompanyLookupBaseAddress ?? ApiBaseAddress ?? new Uri("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9");
 }

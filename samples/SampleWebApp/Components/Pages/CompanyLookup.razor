@@ -1,0 +1,184 @@
+@page "/company-lookup"
+@rendermode InteractiveServer
+@using RomaniaEFactura.Lookup
+@inject IRomaniaEFacturaService EFactura
+
+<PageTitle>Look up a company</PageTitle>
+
+<h1>Look up a company</h1>
+
+<p class="text-secondary">
+    ANAF publishes a register of taxpayers as a service separate from e-Factura. It needs no
+    authorization, so this page works before any company has been connected &mdash; which is what
+    makes it usable on an invoice form.
+</p>
+
+<div class="row g-3 align-items-end mb-4" style="max-width: 40rem;">
+    <div class="col">
+        <label class="form-label" for="cui">Fiscal code (CUI)</label>
+        <input id="cui" class="form-control" @bind="_cui" @bind:event="oninput" placeholder="RO12345674" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" @onclick="LookupOneAsync" disabled="@(_busy || string.IsNullOrWhiteSpace(_cui))">
+            Look up
+        </button>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-secondary" @onclick="LookupManyAsync" disabled="@_busy">
+            Look up several
+        </button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">
+        @_error.Message
+        <div class="small text-secondary mt-1">Kind <code>@_error.Kind</code>.</div>
+    </div>
+}
+
+@if (_notFound)
+{
+    <div class="alert alert-warning">
+        The register does not know <strong>@_cui</strong>. That is an ordinary answer rather than a
+        failure &mdash; a code can be mistyped, or belong to something never registered.
+    </div>
+}
+
+@if (_companies.Count > 0)
+{
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>CUI</th>
+                <th>Name</th>
+                <th>e-Factura</th>
+                <th>VAT</th>
+                <th>Active</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var company in _companies)
+            {
+                <tr>
+                    <td><code>@company.Cui</code></td>
+                    <td>@company.Name</td>
+                    <td>
+                        @if (company.IsRegisteredForEFactura)
+                        {
+                            <span class="badge text-bg-success">registered</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-warning">B2C only</span>
+                        }
+                    </td>
+                    <td>
+                        @if (company.IsVatRegistered)
+                        {
+                            <span class="badge text-bg-secondary">RO@company.Cui</span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary">&mdash;</span>
+                        }
+                    </td>
+                    <td>
+                        @if (company.IsInactive)
+                        {
+                            <span class="badge text-bg-danger">inactive</span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary">yes</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="text-secondary small">
+        Three of those columns decide how a document is built rather than merely describing the
+        company. A buyer that is not in the e-Factura register has to be sent through
+        <code>uploadb2c</code>; one that is not registered for VAT must carry no VAT identifier, or
+        the document claims something untrue about them.
+    </p>
+}
+
+@if (_party is not null)
+{
+    <h2 class="h5 mt-4">As a party on an invoice</h2>
+    <p class="text-secondary">
+        <code>ToPartyEditModel()</code> maps the register onto the party an invoice carries,
+        including the county code that becomes the CIUS-RO subdivision. A starting point, not a
+        finished party: the register holds no email address.
+    </p>
+    <dl class="row">
+        <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@_party.Name</dd>
+        <dt class="col-sm-3">Fiscal code</dt><dd class="col-sm-9">@_party.TaxId</dd>
+        <dt class="col-sm-3">VAT number</dt><dd class="col-sm-9">@(_party.VatNumber ?? "—")</dd>
+        <dt class="col-sm-3">Register no.</dt><dd class="col-sm-9">@(_party.TradeRegisterNumber ?? "—")</dd>
+        <dt class="col-sm-3">Street</dt><dd class="col-sm-9">@_party.Address.Street</dd>
+        <dt class="col-sm-3">City</dt><dd class="col-sm-9">@_party.Address.City</dd>
+        <dt class="col-sm-3">County</dt><dd class="col-sm-9">@(_party.Address.County ?? "—")</dd>
+        <dt class="col-sm-3">Post code</dt><dd class="col-sm-9">@(_party.Address.PostalCode ?? "—")</dd>
+    </dl>
+}
+
+@code {
+    private string _cui = "12345674";
+    private readonly List<RomaniaEFactura.Lookup.CompanyLookup> _companies = [];
+    private RomaniaEFactura.EditModels.PartyEditModel? _party;
+    private RomaniaEFactura.Transport.AnafError? _error;
+    private bool _notFound;
+    private bool _busy;
+
+    private async Task LookupOneAsync()
+    {
+        Reset();
+        _busy = true;
+
+        var result = await EFactura.LookupCompanyAsync(_cui);
+        if (!result.IsSuccess)
+        {
+            _error = result.Error;
+        }
+        else if (result.Value is { } company)
+        {
+            _companies.Add(company);
+            _party = company.ToPartyEditModel();
+        }
+        else
+        {
+            _notFound = true;
+        }
+
+        _busy = false;
+    }
+
+    private async Task LookupManyAsync()
+    {
+        // The register takes a hundred codes per request and allows one request a second, so asking
+        // about several together costs one call rather than one per company.
+        Reset();
+        _busy = true;
+
+        var result = await EFactura.LookupCompaniesAsync(
+            ["12345674", "19867705", "80000009", "98765438"]);
+
+        if (!result.IsSuccess) _error = result.Error;
+        else _companies.AddRange(result.Value.Found);
+
+        _busy = false;
+    }
+
+    private void Reset()
+    {
+        _companies.Clear();
+        _party = null;
+        _error = null;
+        _notFound = false;
+    }
+}
