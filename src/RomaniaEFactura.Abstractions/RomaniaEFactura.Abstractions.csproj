@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RomaniaEFactura</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Everything a layered application's own rules can depend on: the service contract, the edit
+    models and their validation, the UBL types, and the result types.
+
+    Deliberately no ASP.NET Core framework reference, no Entity Framework Core, and no HttpClient.
+    An application layer forbidden from depending on HTTP or persistence - which is a common rule
+    and one an architecture test can enforce - can reference this and still hold the invoice rules,
+    while composition references the full package.
+
+    AbstractionsHaveNoInfrastructureDependency asserts that emptiness, because a split like this
+    rots the first time somebody adds a using and nothing complains.
+  -->
+  <PropertyGroup>
+    <PackageId>RomaniaEFacturaLibrary.Abstractions</PackageId>
+    <Version>3.0.0-alpha.1</Version>
+    <Authors>lucianbumb</Authors>
+    <Description>
+      Contracts for RomaniaEFacturaLibrary: the service interface, the invoice edit models and
+      their CIUS-RO validation, the UBL document types, and the result types. No ASP.NET Core and
+      no Entity Framework Core, so an application layer can depend on it without taking on
+      infrastructure.
+    </Description>
+    <PackageTags>efactura;romania;anaf;spv;ubl;en16931;cius-ro;invoice;abstractions</PackageTags>
+    <PackageProjectUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lucianbumb/RomaniaEFacturaSolution.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The length table and the document projection are internal because nothing outside the
+         validator should be reading them, and both are tested directly against ANAF's Schematron. -->
+    <InternalsVisibleTo Include="RomaniaEFactura" />
+    <InternalsVisibleTo Include="RomaniaEFactura.Tests" />
+    <InternalsVisibleTo Include="RomaniaEFactura.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

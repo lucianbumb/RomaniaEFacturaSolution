@@ -99,11 +99,26 @@ One deployment can serve many companies, each connecting its own authorization. 
 request, and `IEFacturaConnectAuthorizer` so only somebody entitled to a company can connect it.
 See [docs/multi-tenancy.md](docs/multi-tenancy.md).
 
+### Two packages
+
+```
+RomaniaEFacturaLibrary.Abstractions   IRomaniaEFacturaService, the edit models and their CIUS-RO
+                                      validation, the UBL types, the result types
+RomaniaEFacturaLibrary                everything else, and the one you register
+```
+
+Install `RomaniaEFacturaLibrary` and you get both. The split matters for a layered application
+whose domain or application layer is forbidden from depending on HTTP or persistence: that layer
+references `Abstractions` and can still hold the invoice rules, while composition references the
+full package. A test asserts `Abstractions` declares no ASP.NET Core, EF Core, DI, options or
+logging dependency, because a split like that rots the first time somebody adds a using.
+
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `src/RomaniaEFactura` | The library — the only thing published to NuGet |
+| `src/RomaniaEFactura.Abstractions` | Contracts, edit models and validation. No ASP.NET Core, no EF Core |
+| `src/RomaniaEFactura` | The implementation: transport, persistence, endpoints, DI |
 | `tests/RomaniaEFactura.Tests` | Unit tests, plus the validator-oracle comparison |
 | `tests/RomaniaEFactura.IntegrationTests` | Full lifecycle against the mock server |
 | `samples/MockAnafServer` | A local stand-in for ANAF, so everything is testable without credentials |
