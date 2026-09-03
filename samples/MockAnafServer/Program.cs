@@ -1,5 +1,7 @@
 using System.Net.Mime;
+using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using MockAnafServer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -301,6 +303,54 @@ static void MapEFactura(RouteGroupBuilder group)
             : AnafResponses.ValidationResult(false, "Fisierul transmis nu este valid."));
     });
 
+    // -------------------------------------------------- registrul contribuabili
+    // ANAF's public taxpayer register. A different service from e-Factura: unauthenticated, its
+    // own host in production, at most 100 codes per request and one request per second.
+    group.MapPost("/tva", async Task<IResult> (HttpRequest request, MockAnafState state) =>
+    {
+        List<LookupQuery>? queries;
+        try
+        {
+            queries = await JsonSerializer.DeserializeAsync<List<LookupQuery>>(
+                request.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        }
+        catch (JsonException)
+        {
+            return Results.Json(new { eroare = "Structura JSON invalida" });
+        }
+
+        if (queries is null || queries.Count == 0)
+        {
+            return Results.Json(new { eroare = "Lista de CUI-uri este obligatorie" });
+        }
+
+        if (queries.Count > 100)
+        {
+            // ANAF's own ceiling, reproduced so a client that fails to batch is caught here rather
+            // than in production.
+            return Results.Json(new { eroare = "Un request poate contine maxim 100 de CUI-uri" });
+        }
+
+        var found = new List<object>();
+        var notFound = new List<string>();
+
+        foreach (var query in queries)
+        {
+            var cui = query.Cui.ToString(CultureInfo.InvariantCulture);
+            if (state.Companies.TryGetValue(cui, out var company))
+            {
+                found.Add(AnafResponses.RegisterEntry(company, query.Data));
+            }
+            else
+            {
+                notFound.Add(cui);
+            }
+        }
+
+        return Results.Json(new { cod = 200, message = "SUCCESS", found, notFound });
+    });
+
     // ------------------------------------------------------------ transformare
     group.MapPost("/transformare/{standard}/{novld?}", async Task<IResult> (HttpRequest request) =>
     {
@@ -517,3 +567,6 @@ internal sealed record IncomingMessageRequest(
 
 /// <summary>Exposed so the integration tests can host this server in-process.</summary>
 public partial class Program;
+
+/// <summary>One entry of a request to the taxpayer register.</summary>
+internal sealed record LookupQuery(long Cui, string Data);

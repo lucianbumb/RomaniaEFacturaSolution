@@ -131,4 +131,54 @@ public static class AnafResponses
 
     private static string Xml(XElement root) =>
         new XDeclaration("1.0", "UTF-8", "yes") + Environment.NewLine + root;
+
+    /// <summary>
+    /// One entry of the taxpayer register's answer, in ANAF's own shape.
+    /// </summary>
+    /// <remarks>
+    /// The block names and the prefixes on the address fields are ANAF's — <c>sdenumire_Strada</c>
+    /// for the registered office against <c>ddenumire_Strada</c> for the fiscal domicile — and are
+    /// what the client parses, so they are reproduced exactly rather than tidied.
+    /// </remarks>
+    public static object RegisterEntry(RegisteredCompany company, string asOf) => new
+    {
+        date_generale = new
+        {
+            cui = company.Cui,
+            data = asOf,
+            denumire = company.Name,
+            adresa = $"{company.Street} {company.Number}, {company.Locality}, JUD. {company.County}",
+            nrRegCom = company.RegistrationNumber,
+            telefon = company.Phone,
+            codPostal = company.PostalCode,
+            stare_inregistrare = company.Inactive ? "INACTIV" : "INREGISTRAT",
+            cod_CAEN = company.CaenCode,
+            iban = company.Iban,
+            statusRO_e_Factura = company.EFactura,
+        },
+        inregistrare_scop_Tva = new { scpTVA = company.Vat },
+        stare_inactiv = new { statusInactivi = company.Inactive },
+        adresa_sediu_social = new
+        {
+            sdenumire_Strada = company.Street,
+            snumar_Strada = company.Number,
+            sdenumire_Localitate = company.Locality,
+            sdenumire_Judet = company.County,
+            scod_JudetAuto = company.CountyCode,
+            stara = company.Country,
+            sdetalii_Adresa = company.Details,
+            scod_Postal = company.PostalCode,
+        },
+        adresa_domiciliu_fiscal = new
+        {
+            ddenumire_Strada = company.Street,
+            dnumar_Strada = company.Number,
+            ddenumire_Localitate = company.Locality,
+            ddenumire_Judet = company.County,
+            dcod_JudetAuto = company.CountyCode,
+            dtara = company.Country,
+            ddetalii_Adresa = company.Details,
+            dcod_Postal = company.PostalCode,
+        },
+    };
 }

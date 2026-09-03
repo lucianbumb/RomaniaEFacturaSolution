@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using RomaniaEFactura.Authentication;
 using RomaniaEFactura.Configuration;
+using RomaniaEFactura.Lookup;
 using RomaniaEFactura.Persistence;
 using RomaniaEFactura.Reconciliation;
 using RomaniaEFactura.Transport;
@@ -72,6 +73,10 @@ public static class ServiceCollectionExtensions
 
         services.AddDataProtection();
         services.AddHttpClient(AnafApiClient.HttpClientName);
+
+        // Its own client: a different host, no authorization, and its own rate limit.
+        services.AddHttpClient(AnafCompanyLookupClient.HttpClientName);
+        services.AddScoped<IAnafCompanyLookupClient, AnafCompanyLookupClient>();
 
         if (configureDatabase is not null)
         {

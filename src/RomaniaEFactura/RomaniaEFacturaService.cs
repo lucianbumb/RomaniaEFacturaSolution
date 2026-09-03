@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RomaniaEFactura.Authentication;
 using RomaniaEFactura.Configuration;
+using RomaniaEFactura.Lookup;
 using RomaniaEFactura.EditModels;
 using RomaniaEFactura.Persistence;
 using RomaniaEFactura.Reconciliation;
@@ -20,6 +21,7 @@ public sealed class RomaniaEFacturaService(
     EFacturaDbContext db,
     IOptions<EFacturaOptions> options,
     TimeProvider time,
+    IAnafCompanyLookupClient lookup,
     ILogger<RomaniaEFacturaService> logger,
     IEFacturaCompanyProvider? companyProvider = null) : IRomaniaEFacturaService
 {
@@ -410,6 +412,27 @@ public sealed class RomaniaEFacturaService(
                 AnafErrorKind.Unreadable, $"The downloaded archive could not be read: {ex.Message}"));
         }
     }
+
+    // ------------------------------------------------------------------- lookup
+
+    /// <inheritdoc />
+    public async Task<AnafResult<CompanyLookup?>> LookupCompanyAsync(
+        string cui, DateOnly? on = null, CancellationToken cancellationToken = default)
+    {
+        var result = await lookup.LookupAsync([cui], on, cancellationToken).ConfigureAwait(false);
+
+        if (!result.IsSuccess) return result.CarryError<CompanyLookup?>();
+
+        // Not found is an ordinary answer, not a failure: a code can be mistyped, or belong to
+        // something never registered. A caller distinguishes it from an outage by the result being
+        // a success carrying null.
+        return AnafResult<CompanyLookup?>.Success(result.Value.Found.FirstOrDefault());
+    }
+
+    /// <inheritdoc />
+    public Task<AnafResult<CompanyLookupResult>> LookupCompaniesAsync(
+        IEnumerable<string> cuis, DateOnly? on = null, CancellationToken cancellationToken = default) =>
+        lookup.LookupAsync(cuis, on, cancellationToken);
 
     // ------------------------------------------------------------------ utility
 

@@ -283,6 +283,7 @@ public class EditModelEndToEndTests(MockAnafFixture fixture)
         services.AddScoped<IAnafOAuthClient, AnafOAuthClient>();
         services.AddScoped<IAnafAccessTokenProvider, StoredTokenAccessTokenProvider>();
         services.AddScoped<IAnafApiClient, AnafApiClient>();
+        services.AddScoped<RomaniaEFactura.Lookup.IAnafCompanyLookupClient, RomaniaEFactura.Lookup.AnafCompanyLookupClient>();
         services.AddScoped<IRomaniaEFacturaService, RomaniaEFacturaService>();
         services.AddScoped<Reconciliation.EFacturaReconciler>();
 
