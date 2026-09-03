@@ -40,26 +40,25 @@ namespace RomaniaEFactura.Tests.Persistence;
 public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
 {
     private readonly string _schema = "efactura_test_" + Guid.NewGuid().ToString("n")[..12];
-    private EFacturaDbContext _db = null!;
+    private SchemaScopedContext _db = null!;
 
     public async Task InitializeAsync()
     {
         if (!PostgreSql.IsConfigured) return;
 
-        _db = CreateContext();
+        // Not EnsureCreatedAsync: it creates nothing once the database exists, and the CI database
+        // does - so the first test to run created tables and the rest silently got none.
+        _db = new SchemaScopedContext(
+            SchemaScopedContext.Options(PostgreSql.ConnectionString!, _schema), _schema);
 
-        // Not EnsureCreatedAsync. It creates nothing once the database exists, and the CI database
-        // does - so the first test to run created its schema and the rest silently got none. It
-        // passed on a fresh run and failed on a re-run, which is exactly how it was found.
-        await _db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{_schema}\";");
-        await ((RelationalDatabaseCreator)_db.GetService<IDatabaseCreator>()).CreateTablesAsync();
+        await _db.CreateAsync();
     }
 
     public async Task DisposeAsync()
     {
         if (!PostgreSql.IsConfigured) return;
 
-        await _db.Database.ExecuteSqlRawAsync($"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE;");
+        await _db.DropAsync();
         await _db.DisposeAsync();
     }
 
@@ -202,25 +201,6 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         new(db, DataProtectionProvider.Create(
             new DirectoryInfo(Path.Combine(Path.GetTempPath(), "romania-efactura-tests", "postgres"))));
 
-    private EFacturaDbContext CreateContext()
-    {
-        var options = new DbContextOptionsBuilder<EFacturaDbContext>()
-            .UseNpgsql(PostgreSql.ConnectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrations", _schema))
-            .Options;
-
-        return new SchemaScopedContext(options, _schema);
-    }
-
-    /// <summary>Puts this test's tables in their own schema, so tests do not collide.</summary>
-    private sealed class SchemaScopedContext(DbContextOptions<EFacturaDbContext> options, string schema)
-        : EFacturaDbContext(options)
-    {
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            base.OnModelCreating(modelBuilder);
-            modelBuilder.HasDefaultSchema(schema);
-        }
-    }
 }
 
 /// <summary>

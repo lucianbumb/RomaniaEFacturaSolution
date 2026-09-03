@@ -81,11 +81,13 @@ public class ExistingDatabaseTests
     public async Task TheSameHoldsOnPostgreSql()
     {
         // The provider the finding actually came from, and the one the first consumer runs.
+        // Its own schema, like the other PostgreSQL tests, so this does not create the library's
+        // tables in public and collide with anything else running against the same server.
         var schema = "efactura_existing_" + Guid.NewGuid().ToString("n")[..12];
+        var options = SchemaScopedContext.Options(PostgreSql.ConnectionString!, schema);
 
         var services = new ServiceCollection();
-        services.AddDbContext<EFacturaDbContext>(o =>
-            o.UseNpgsql(PostgreSql.ConnectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrations", schema)));
+        services.AddScoped(_ => (EFacturaDbContext)new SchemaScopedContext(options, schema));
 
         await using var provider = services.BuildServiceProvider();
 
@@ -93,6 +95,8 @@ public class ExistingDatabaseTests
         {
             var db = scope.ServiceProvider.GetRequiredService<EFacturaDbContext>();
             await db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schema}\";");
+
+            // Somebody else's table, in the schema the library is about to be asked to populate.
             await db.Database.ExecuteSqlRawAsync(
                 $"CREATE TABLE IF NOT EXISTS \"{schema}\".\"Businesses\" (\"Id\" int primary key);");
         }
