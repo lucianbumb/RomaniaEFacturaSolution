@@ -78,6 +78,13 @@ store, and an authorization left open to anonymous callers can be replaced by an
 own certificate. [docs/security.md](docs/security.md) explains what that costs and how to narrow
 access further.
 
+### Serving several companies
+
+One deployment can serve many companies, each connecting its own authorization. Implement
+`IEFacturaCompanyProvider` so the CIF comes from whatever identifies the business on the current
+request, and `IEFacturaConnectAuthorizer` so only somebody entitled to a company can connect it.
+See [docs/multi-tenancy.md](docs/multi-tenancy.md).
+
 ## Repository layout
 
 | Path | What it is |
@@ -92,6 +99,7 @@ access further.
 | `docs/live-run.md` | Running against ANAF's real test environment — needs credentials and a certificate |
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
 | `docs/security.md` | What the library protects, what the host application owns, and why |
+| `docs/multi-tenancy.md` | Serving several companies from one deployment |
 | `documentation_efactura/` | ANAF's own published specifications |
 
 ## Contributing

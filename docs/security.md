@@ -164,6 +164,8 @@ and asserts the dictionary is unchanged.
 
 ## Serving several companies from one deployment
 
+> Wiring is in [multi-tenancy.md](multi-tenancy.md). What follows is what the library enforces.
+
 The per-call `cif` override exists so one deployment can serve several companies. They share one
 database, so **every lookup by identifier is scoped by company**:
 

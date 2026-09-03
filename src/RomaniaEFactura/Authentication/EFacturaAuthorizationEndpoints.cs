@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using RomaniaEFactura.Configuration;
 
 namespace RomaniaEFactura.Authentication;
 
@@ -97,11 +99,14 @@ public static class EFacturaAuthorizationEndpoints
 
         // Sends the user to ANAF. There is no headless alternative: authorization requires a
         // qualified certificate presented by a real browser.
-        group.MapGet("/connect/{cif}", (
+        group.MapGet("/connect/{cif}", async (
             HttpContext context,
             string cif,
             string? returnUrl,
-            IAnafOAuthClient oauth) =>
+            IAnafOAuthClient oauth,
+            IEFacturaConnectAuthorizer authorizer,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
         {
             // The CIF comes from the path, so a mistyped one is a bad request rather than a fault.
             // Without this it reaches BuildAuthorizationUrl as an argument exception, and the person
@@ -110,6 +115,17 @@ public static class EFacturaAuthorizationEndpoints
             {
                 return Results.BadRequest(
                     "That is not a valid Romanian fiscal code - the control digit does not match.");
+            }
+
+            // Checked before the redirect, so somebody who was never going to be allowed is not
+            // sent to ANAF and asked for a certificate first.
+            if (!await authorizer.CanConnectAsync(context.User, cif, cancellationToken).ConfigureAwait(false))
+            {
+                loggerFactory.CreateLogger("RomaniaEFactura.Authorization").LogWarning(
+                    "Refused to start an authorization for CIF {Cif}: the signed-in user may not connect it.",
+                    cif);
+
+                return Results.Forbid();
             }
 
             return Results.Redirect(oauth.BuildAuthorizationUrl(cif, returnUrl, UserKey(context)).ToString());
@@ -123,10 +139,13 @@ public static class EFacturaAuthorizationEndpoints
             IAnafOAuthClient oauth,
             IEFacturaTokenStore store,
             OAuthStateProtector stateProtector,
+            IEFacturaConnectAuthorizer authorizer,
+            IOptions<EFacturaOptions> options,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("RomaniaEFactura.Authorization");
+            var allowedOrigins = options.Value.AllowedReturnOrigins;
 
             // The state is validated before anything else is trusted. It is the only thing tying
             // this callback to a request this application actually made, and it carries the
@@ -149,10 +168,21 @@ public static class EFacturaAuthorizationEndpoints
                 return Results.BadRequest("This authorization was started by a different user. Please start again.");
             }
 
+            // Checked again here, not only at connect. Entitlement can be withdrawn during the round
+            // trip, and a state minted while it held would otherwise still write a token.
+            if (!await authorizer.CanConnectAsync(context.User, validated.Cif, cancellationToken).ConfigureAwait(false))
+            {
+                logger.LogWarning(
+                    "Refused an ANAF callback for CIF {Cif}: the signed-in user may not connect it.",
+                    validated.Cif);
+
+                return Results.Forbid();
+            }
+
             if (!string.IsNullOrEmpty(error))
             {
                 logger.LogWarning("ANAF reported an authorization error for CIF {Cif}: {Error}", validated.Cif, error);
-                return RedirectSafely(validated.ReturnUrl, $"efactura_error={Uri.EscapeDataString(error)}");
+                return RedirectSafely(validated.ReturnUrl, $"efactura_error={Uri.EscapeDataString(error)}", allowedOrigins);
             }
 
             if (string.IsNullOrEmpty(code))
@@ -165,13 +195,13 @@ public static class EFacturaAuthorizationEndpoints
             {
                 logger.LogError("Exchanging the authorization code failed for CIF {Cif}: {Error}",
                     validated.Cif, token.Error);
-                return RedirectSafely(validated.ReturnUrl, "efactura_error=token_exchange_failed");
+                return RedirectSafely(validated.ReturnUrl, "efactura_error=token_exchange_failed", allowedOrigins);
             }
 
             await store.SaveAsync(token.Value, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Stored an ANAF authorization for CIF {Cif}.", validated.Cif);
 
-            return RedirectSafely(validated.ReturnUrl, "efactura_connected=1");
+            return RedirectSafely(validated.ReturnUrl, "efactura_connected=1", allowedOrigins);
         });
 
         return group;
@@ -227,24 +257,56 @@ public static class EFacturaAuthorizationEndpoints
     }
 
     /// <summary>
-    /// Redirects only within this application.
+    /// Redirects within this application, or to an origin the host has named.
     /// </summary>
     /// <remarks>
     /// The return URL arrives inside the protected state, so it cannot be chosen by an attacker —
     /// but it is still checked here, so that a bug elsewhere cannot turn this endpoint into an
     /// open redirect.
     /// </remarks>
-    private static IResult RedirectSafely(string? returnUrl, string query)
+    private static IResult RedirectSafely(string? returnUrl, string query, IList<string> allowedOrigins)
     {
-        var target = IsLocalUrl(returnUrl) ? returnUrl! : "/";
+        var target = IsAllowedReturnUrl(returnUrl, allowedOrigins) ? returnUrl! : "/";
         var separator = target.Contains('?', StringComparison.Ordinal) ? "&" : "?";
 
         return Results.Redirect($"{target}{separator}{query}");
     }
+
+    private static bool IsAllowedReturnUrl(string? url, IList<string> allowedOrigins) =>
+        IsLocalUrl(url) || IsAllowedOrigin(url, allowedOrigins);
 
     private static bool IsLocalUrl(string? url) =>
         !string.IsNullOrEmpty(url)
         && url[0] == '/'
         // "//host" and "/\host" are protocol-relative and would leave the application.
         && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'));
+
+    /// <summary>
+    /// Whether an absolute return URL is one the host named.
+    /// </summary>
+    /// <remarks>
+    /// Compared as parsed scheme, host and port rather than as text. A prefix comparison would
+    /// accept <c>https://app.example.ro.evil.test</c> for an allowed <c>https://app.example.ro</c>,
+    /// which is the whole reason an allow-list can go wrong.
+    /// </remarks>
+    private static bool IsAllowedOrigin(string? url, IList<string> allowedOrigins)
+    {
+        if (allowedOrigins is not { Count: > 0 }) return false;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var target)) return false;
+        if (target.Scheme != Uri.UriSchemeHttps && target.Scheme != Uri.UriSchemeHttp) return false;
+
+        foreach (var origin in allowedOrigins)
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var allowed)) continue;
+
+            if (string.Equals(allowed.Scheme, target.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(allowed.Host, target.Host, StringComparison.OrdinalIgnoreCase)
+                && allowed.Port == target.Port)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

@@ -140,6 +140,119 @@ public class AuthorizationEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // ------------------------------------------ who may connect which company
+
+    [Fact]
+    public async Task AUserWhoMayNotConnectACompanyIsRefusedBeforeAnafIsInvolved()
+    {
+        // The multi-tenant half of the authentication requirement. Being signed in says nothing
+        // about which businesses a person may act for, and the CIF arrives in the path.
+        using var host = await CreateHostAsync(authorizer: new AllowNobody());
+        using var client = host.GetTestClient();
+
+        var response = await Get(client, $"/efactura/connect/{Cif}", user: "alice");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ACallbackForACompanyTheUserMayNotConnectStoresNothing()
+    {
+        // Checked again at the callback, not only at connect: entitlement can be withdrawn during
+        // the round trip, and a state minted while it held would otherwise still write a token.
+        using var host = await CreateHostAsync(authorizer: new AllowNobody());
+        using var client = host.GetTestClient();
+
+        var state = StateFor(host, user: "alice");
+        var response = await Get(client, $"/efactura/callback?code=good&state={Uri.EscapeDataString(state)}", user: "alice");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Empty(await StoredCifsAsync(host));
+    }
+
+    [Fact]
+    public async Task AUserEntitledToTheCompanyIsLetThrough()
+    {
+        using var host = await CreateHostAsync(authorizer: new AllowEverybody());
+        using var client = host.GetTestClient();
+
+        var response = await Get(client, $"/efactura/connect/{Cif}", user: "alice");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WithNoAuthorizerOnlyTheConfiguredCompanyMayBeConnected()
+    {
+        // The default. Correct for a deployment that names one company, and refusing every other
+        // is the safe direction for one that has not thought about it yet.
+        using var host = await CreateHostAsync();
+        using var client = host.GetTestClient();
+
+        var mine = await Get(client, $"/efactura/connect/{Cif}", user: "alice");
+        var theirs = await Get(client, "/efactura/connect/19867705", user: "alice");
+
+        Assert.Equal(HttpStatusCode.Redirect, mine.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, theirs.StatusCode);
+    }
+
+    // -------------------------------------------------- returning to the app
+
+    [Fact]
+    public async Task ALocalReturnUrlIsStillHonoured()
+    {
+        using var host = await CreateHostAsync();
+        using var client = host.GetTestClient();
+
+        var state = StateFor(host, user: "alice", returnUrl: "/invoices");
+        var response = await Get(client, $"/efactura/callback?code=good&state={Uri.EscapeDataString(state)}", user: "alice");
+
+        Assert.StartsWith("/invoices?", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnOffOriginReturnUrlIsRefusedByDefault()
+    {
+        using var host = await CreateHostAsync();
+        using var client = host.GetTestClient();
+
+        var state = StateFor(host, user: "alice", returnUrl: "https://app.example.ro/done");
+        var response = await Get(client, $"/efactura/callback?code=good&state={Uri.EscapeDataString(state)}", user: "alice");
+
+        Assert.StartsWith("/?", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnAllowedOriginIsHonoured()
+    {
+        // The case a separate SPA or PWA needs: the interface is not served by this host.
+        using var host = await CreateHostAsync(allowedOrigins: ["https://app.example.ro"]);
+        using var client = host.GetTestClient();
+
+        var state = StateFor(host, user: "alice", returnUrl: "https://app.example.ro/done");
+        var response = await Get(client, $"/efactura/callback?code=good&state={Uri.EscapeDataString(state)}", user: "alice");
+
+        Assert.StartsWith("https://app.example.ro/done?", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://app.example.ro.evil.test/done")]
+    [InlineData("http://app.example.ro/done")]
+    [InlineData("https://app.example.ro:8443/done")]
+    [InlineData("https://evil.test/done")]
+    public async Task AnOriginThatOnlyLooksAllowedIsRefused(string returnUrl)
+    {
+        // The first is the one an allow-list gets wrong: it has the allowed origin as a text
+        // prefix. The others differ by scheme and by port, which are part of an origin.
+        using var host = await CreateHostAsync(allowedOrigins: ["https://app.example.ro"]);
+        using var client = host.GetTestClient();
+
+        var state = StateFor(host, user: "alice", returnUrl: returnUrl);
+        var response = await Get(client, $"/efactura/callback?code=good&state={Uri.EscapeDataString(state)}", user: "alice");
+
+        Assert.StartsWith("/?", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
     // ------------------------------------------------- binding the round trip
 
     [Fact]
@@ -188,8 +301,8 @@ public class AuthorizationEndpointTests
 
     // ------------------------------------------------------------- the harness
 
-    private static string StateFor(IHost host, string? user) =>
-        host.Services.GetRequiredService<OAuthStateProtector>().Protect(Cif, "/invoices", user);
+    private static string StateFor(IHost host, string? user, string? returnUrl = "/invoices") =>
+        host.Services.GetRequiredService<OAuthStateProtector>().Protect(Cif, returnUrl, user);
 
     private static async Task<IReadOnlyList<string>> StoredCifsAsync(IHost host) =>
         await host.Services.GetRequiredService<IEFacturaTokenStore>().ListAuthorizedCifsAsync();
@@ -204,7 +317,9 @@ public class AuthorizationEndpointTests
     private static async Task<IHost> CreateHostAsync(
         bool registerAuthorization = true,
         Action<EFacturaAuthorizationEndpointOptions>? configure = null,
-        Action<Microsoft.AspNetCore.Routing.RouteGroupBuilder>? extraConvention = null)
+        Action<Microsoft.AspNetCore.Routing.RouteGroupBuilder>? extraConvention = null,
+        IEFacturaConnectAuthorizer? authorizer = null,
+        string[]? allowedOrigins = null)
     {
         var host = await new HostBuilder()
             .ConfigureWebHost(web =>
@@ -216,6 +331,14 @@ public class AuthorizationEndpointTests
                     services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
                     services.AddDataProtection().SetApplicationName("efactura-endpoint-tests");
                     services.AddSingleton<IEFacturaTokenStore, InMemoryTokenStore>();
+                    services.AddSingleton<Microsoft.Extensions.Options.IOptions<Configuration.EFacturaOptions>>(
+                        Microsoft.Extensions.Options.Options.Create(new Configuration.EFacturaOptions
+                        {
+                            Cif = Cif,
+                            AllowedReturnOrigins = allowedOrigins ?? [],
+                        }));
+                    services.AddSingleton<IEFacturaConnectAuthorizer>(
+                        authorizer ?? new AllowConfiguredOnly(Cif));
                     services.AddSingleton<OAuthStateProtector>();
                     services.AddSingleton<IAnafOAuthClient, FakeOAuthClient>();
 
@@ -246,6 +369,28 @@ public class AuthorizationEndpointTests
             .StartAsync();
 
         return host;
+    }
+
+    private sealed class AllowNobody : IEFacturaConnectAuthorizer
+    {
+        public ValueTask<bool> CanConnectAsync(
+            System.Security.Claims.ClaimsPrincipal user, string cif, CancellationToken ct = default) =>
+            ValueTask.FromResult(false);
+    }
+
+    private sealed class AllowEverybody : IEFacturaConnectAuthorizer
+    {
+        public ValueTask<bool> CanConnectAsync(
+            System.Security.Claims.ClaimsPrincipal user, string cif, CancellationToken ct = default) =>
+            ValueTask.FromResult(true);
+    }
+
+    /// <summary>Stands in for the library default, which allows only the configured company.</summary>
+    private sealed class AllowConfiguredOnly(string configured) : IEFacturaConnectAuthorizer
+    {
+        public ValueTask<bool> CanConnectAsync(
+            System.Security.Claims.ClaimsPrincipal user, string cif, CancellationToken ct = default) =>
+            ValueTask.FromResult(string.Equals(configured, cif, StringComparison.Ordinal));
     }
 
     /// <summary>Authenticates whoever the request names, so a test can be two different people.</summary>

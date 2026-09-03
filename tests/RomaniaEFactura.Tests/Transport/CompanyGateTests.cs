@@ -37,17 +37,23 @@ public class CompanyGateTests
         // the same request repeated with fresh values would grow the dictionary without limit.
         var http = new RecordingHttpClientFactory();
         var client = CreateClient(token: null, http: http);
-        var before = GateKeys();
+        var attempted = new List<string>();
 
         for (var i = 0; i < 50; i++)
         {
-            var result = await client.ListMessagesAsync(days: 7, cif: SyntheticCif(i));
+            var cif = SyntheticCif(i);
+            attempted.Add(cif);
+
+            var result = await client.ListMessagesAsync(days: 7, cif: cif);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(AnafErrorKind.NotAuthorized, result.Error!.Kind);
         }
 
-        Assert.Equal(before, GateKeys());
+        // Asserted about these fifty companies rather than about the size of the dictionary. It is
+        // process-wide and xUnit runs test classes in parallel, so anything stated about the whole
+        // of it is a race - which is exactly how this test first broke.
+        Assert.Empty(GateKeys().Intersect(attempted));
     }
 
     [Fact]
@@ -84,11 +90,10 @@ public class CompanyGateTests
     public async Task AMalformedCifNeverBecomesAKey()
     {
         var client = CreateClient();
-        var before = GateKeys();
 
         await Assert.ThrowsAsync<ArgumentException>(() => client.ListMessagesAsync(days: 7, cif: "not-a-cif"));
 
-        Assert.Equal(before, GateKeys());
+        Assert.DoesNotContain("not-a-cif", GateKeys());
     }
 
     [Fact]
@@ -97,14 +102,17 @@ public class CompanyGateTests
         // Both normalise to the same key, so they share one pacing gate rather than racing each
         // other into ANAF's rate limiter.
         var client = CreateClient();
-        var before = GateKeys();
 
         await client.ListMessagesAsync(days: 7, cif: "RO12345674");
         await client.ListMessagesAsync(days: 7, cif: " 12345674 ");
 
-        // Asserted as a set difference rather than a count, so the shared static state cannot make
-        // this pass or fail on the order the class happens to run in.
-        Assert.Equal(["12345674"], GateKeys().Except(before).Order());
+        // Stated as which keys exist rather than as a delta. The dictionary is process-wide, so a
+        // delta depends on whether another test class reached this company first - which is how
+        // this test broke when one did.
+        var keys = GateKeys();
+        Assert.Contains("12345674", keys);
+        Assert.DoesNotContain("RO12345674", keys);
+        Assert.DoesNotContain(" 12345674 ", keys);
     }
 
     [Fact]

@@ -64,6 +64,23 @@ public sealed class EFacturaOptions
     /// </summary>
     public TimeSpan MinimumDelayBetweenCalls { get; set; } = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>
+    /// Origins the post-callback redirect may return to, besides paths within this application.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Empty by default, and a local path is always allowed, so an application whose user interface
+    /// is served by the same host needs none of this.
+    /// </para>
+    /// <para>
+    /// Name an origin here when the interface is somewhere else — a separate SPA or PWA. Each entry
+    /// is an absolute origin, scheme and host and port; a path on an entry is ignored, and matching
+    /// is on the parsed components rather than on the text, so
+    /// <c>https://app.example.ro.evil.test</c> does not match <c>https://app.example.ro</c>.
+    /// </para>
+    /// </remarks>
+    public IList<string> AllowedReturnOrigins { get; set; } = [];
+
     /// <summary>Whether the background reconciler runs.</summary>
     /// <remarks>
     /// Turning it off leaves submissions permanently unresolved unless something else calls the
