@@ -320,14 +320,27 @@ public sealed class RomaniaEFacturaService(
             added++;
         }
 
+        // The schedule is written here rather than by the sweep, so a sync somebody asked for
+        // counts as this company having been read and does not leave it due a moment later.
+        var nextSyncAt = now + _options.InboxSyncInterval;
+
         if (cursor is null)
         {
-            db.InboxCursors.Add(new EFacturaInboxCursor { Cif = company, SyncedUpTo = now, LastSyncedAt = now });
+            db.InboxCursors.Add(new EFacturaInboxCursor
+            {
+                Cif = company,
+                SyncedUpTo = now,
+                LastSyncedAt = now,
+                NextSyncAt = nextSyncAt,
+            });
         }
         else
         {
             cursor.SyncedUpTo = now;
             cursor.LastSyncedAt = now;
+            cursor.NextSyncAt = nextSyncAt;
+            cursor.ConsecutiveFailures = 0;
+            cursor.LastError = null;
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

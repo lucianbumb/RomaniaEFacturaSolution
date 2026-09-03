@@ -106,6 +106,26 @@ public sealed class EFacturaOptions
     /// </remarks>
     public TimeSpan ReconcileInterval { get; set; } = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// Whether the background sweep reads every authorized company's inbox.
+    /// </summary>
+    /// <remarks>
+    /// <b>Off by default</b>, unlike the reconciler. The reconciler only calls ANAF about documents
+    /// the application itself submitted; this polls on its own initiative, against an allowance
+    /// that belongs to each company, so it is something to turn on deliberately rather than
+    /// something an upgrade should start doing.
+    /// </remarks>
+    public bool EnableInboxSync { get; set; }
+
+    /// <summary>
+    /// How long between reads of one company's inbox.
+    /// </summary>
+    /// <remarks>
+    /// Per company, not for the sweep as a whole: with a hundred companies a shared interval would
+    /// mean a hundred calls on every tick. After a failure the interval widens, up to a day.
+    /// </remarks>
+    public TimeSpan InboxSyncInterval { get; set; } = TimeSpan.FromMinutes(15);
+
     /// <summary>How many submissions one reconciliation pass will handle.</summary>
     public int ReconcileBatchSize { get; set; } = 25;
 

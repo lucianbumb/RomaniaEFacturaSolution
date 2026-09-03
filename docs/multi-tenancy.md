@@ -91,6 +91,32 @@ options.AllowedReturnOrigins = ["https://app.example.ro"];
 Matching is on the parsed scheme, host and port, so a host that merely *starts with* an allowed
 origin is still refused.
 
+## Reading every company's inbox
+
+Nothing reads the SPV inbox on its own unless you ask for it:
+
+```csharp
+options.EnableInboxSync = true;
+options.InboxSyncInterval = TimeSpan.FromMinutes(15);   // per company
+```
+
+**Off by default**, unlike the reconciler. The reconciler only calls ANAF about documents the
+application itself submitted; the sweep polls on its own initiative, against an allowance belonging
+to each company, so it is something to turn on deliberately rather than something an upgrade should
+start doing.
+
+The interval is **per company, not per sweep**. With a hundred companies a shared interval would
+mean a hundred calls on every tick, so each carries its own next-due time in
+`EFacturaInboxCursor`.
+
+The sweep **lists and records; it does not download**. `descarcare` is capped at roughly ten calls
+per identifier per day, and fetching every new message eagerly would spend a company allowance
+before anybody asked to read one. Archives are fetched when a document is actually opened.
+
+A company whose authorization has lapsed is **deferred rather than retried every pass** — the
+interval doubles with consecutive failures up to a day, and the reason is recorded on the cursor
+where somebody diagnosing a quiet inbox would look.
+
 ## What is already per-company, and needs nothing
 
 - **Storage.** Tokens, submissions, the inbox and its cursors are all keyed by CIF, and every

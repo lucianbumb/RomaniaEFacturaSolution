@@ -82,6 +82,13 @@ internal sealed class EFacturaOptionsValidator : IValidateOptions<EFacturaOption
                 + "and the reconciler would fail on its first tick.");
         }
 
+        if (options.EnableInboxSync && options.InboxSyncInterval <= TimeSpan.Zero)
+        {
+            failures.Add(
+                "EFactura:InboxSyncInterval must be positive when the inbox sweep is enabled; "
+                + "otherwise every company is due on every pass.");
+        }
+
         if (options.ReconcileBatchSize < 1)
         {
             failures.Add("EFactura:ReconcileBatchSize must be at least 1, or no submission is ever settled.");
