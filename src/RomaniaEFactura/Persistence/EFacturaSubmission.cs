@@ -124,4 +124,25 @@ public sealed class EFacturaInboxCursor
 
     /// <summary>When the last successful sync ran.</summary>
     public DateTimeOffset LastSyncedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// When the background sweep should next read this company.
+    /// </summary>
+    /// <remarks>
+    /// Per company rather than one interval for the whole set: with a hundred companies a shared
+    /// interval means a hundred calls on every tick.
+    /// </remarks>
+    public DateTimeOffset NextSyncAt { get; set; }
+
+    /// <summary>
+    /// Consecutive failures, which widen the interval.
+    /// </summary>
+    /// <remarks>
+    /// Without it a company whose authorization has lapsed is retried on every pass forever, and
+    /// the log fills with a rights problem that nothing is going to resolve on its own.
+    /// </remarks>
+    public int ConsecutiveFailures { get; set; }
+
+    /// <summary>The last thing that went wrong, for a person diagnosing a quiet inbox.</summary>
+    public string? LastError { get; set; }
 }

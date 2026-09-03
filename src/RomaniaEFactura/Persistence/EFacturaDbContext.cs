@@ -104,6 +104,10 @@ public class EFacturaDbContext(DbContextOptions<EFacturaDbContext> options) : Db
             entity.ToTable("EFacturaInboxCursors");
             entity.HasKey(c => c.Cif);
             entity.Property(c => c.Cif).HasMaxLength(20);
+            entity.Property(c => c.LastError).HasMaxLength(2000);
+
+            // The sweep asks "which companies are due", so that is what is indexed.
+            entity.HasIndex(c => c.NextSyncAt);
         });
     }
 }

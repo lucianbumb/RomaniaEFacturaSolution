@@ -105,6 +105,11 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IRomaniaEFacturaService, RomaniaEFacturaService>();
             services.AddSingleton<EFacturaReconciler>();
             services.AddHostedService<ReconcilerHostedService>();
+
+            // Registered whether or not the sweep is enabled: the hosted service reports that it
+            // is off, which is more useful than a service that silently is not there.
+            services.AddSingleton<InboxSweeper>();
+            services.AddHostedService<InboxSweeperHostedService>();
         }
     }
 }
