@@ -58,6 +58,27 @@ around.
 The pacing is **per client, not per company**, unlike the e-Factura endpoints. Two lookups about
 different companies still have to be a second apart, so the state is shared across the process.
 
+## If you expose this to people you do not trust
+
+The lookup needs no ANAF authorization, so it is tempting to put it behind an open form — and it is
+the one call in the library that works before a company has been connected, which makes that
+tempting for good reasons.
+
+Two things follow from the one-request-per-second limit being **per client**, not per caller:
+
+- Every lookup in the process queues behind every other. Nothing breaks — the waits are
+  asynchronous, so no thread is held — but a burst from one caller delays everybody else's.
+- A lookup looks cheap because it needs no credential. It is not: it is a network call to ANAF with
+  a hard rate limit attached.
+
+**Rate-limit your own endpoint**, and prefer `LookupCompaniesAsync` over a loop. The library paces
+what it sends; it cannot pace what you ask it for, and it should not decide your endpoint's policy.
+
+The base address is held to the same rule as the API and OAuth ones — `https`, or `http` only
+against a loopback host — checked at startup. It carries no credential, but its answer decides
+whether a document is addressed as B2B or through `uploadb2c`, so anyone able to answer the request
+can make an application send documents the wrong way.
+
 ## Duplicates and unknown codes
 
 Repeated codes are asked about once — `12345674`, `RO12345674` and `" 12345674 "` are one company.

@@ -75,6 +75,27 @@ public class OptionsValidationTests
     }
 
     [Fact]
+    public void APlaintextCompanyLookupAddressIsRefused()
+    {
+        // It carries no token, which is why this was missed when the setting was added. What comes
+        // back decides whether a document is addressed as B2B or through uploadb2c, so anyone able
+        // to answer the request can make an application send documents the wrong way.
+        var message = Refused(o => o.CompanyLookupBaseAddress = new Uri("http://register.example.ro/api"));
+
+        Assert.Contains("CompanyLookupBaseAddress", message, StringComparison.Ordinal);
+        Assert.Contains("not https", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void APlaintextLoopbackCompanyLookupAddressIsAccepted()
+    {
+        // The mock server, which is the reason the override exists.
+        using var host = Build(o => o.CompanyLookupBaseAddress = new Uri("http://localhost:5049/api"));
+
+        Assert.NotNull(host.Services.GetRequiredService<IOptions<EFacturaOptions>>().Value);
+    }
+
+    [Fact]
     public void ABaseAddressThatIsNotHttpIsRefused()
     {
         Assert.Contains(
