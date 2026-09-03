@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -64,13 +65,43 @@ public static class SchemaInitializer
 
         // No migrations anywhere: create just this context's tables, leaving any other schema in
         // the database untouched.
-        if (await creator.HasTablesAsync(cancellationToken).ConfigureAwait(false))
+        //
+        // Asked about this context's own tables rather than through RelationalDatabaseCreator's
+        // HasTablesAsync, which answers "does this database contain any tables at all". That is the
+        // same question only for a database dedicated to the library - every test, and the sample
+        // app. Against an application's existing database it is true because of the host's own
+        // tables, so the library's were never created and every call afterwards failed with a
+        // missing relation, under a log line saying the schema already existed.
+        if (await HasOwnTablesAsync(db, cancellationToken).ConfigureAwait(false))
         {
-            logger?.LogDebug("The e-Factura schema already exists.");
+            logger?.LogDebug("The e-Factura tables are already present.");
             return;
         }
 
-        logger?.LogInformation("Creating the e-Factura schema.");
+        logger?.LogInformation("Creating the e-Factura tables.");
         await creator.CreateTablesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether this context's own tables exist.
+    /// </summary>
+    /// <remarks>
+    /// By querying one rather than by reading metadata: there is no cross-provider metadata query.
+    /// <c>INFORMATION_SCHEMA</c> is absent on SQLite, which keeps its catalogue in
+    /// <c>sqlite_master</c>, so anything portable has to ask the database a question it will answer
+    /// either way. A provider error here means the table is not there, which is the only thing this
+    /// needs to distinguish.
+    /// </remarks>
+    private static async Task<bool> HasOwnTablesAsync(EFacturaDbContext db, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.Tokens.AnyAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (DbException)
+        {
+            return false;
+        }
     }
 }

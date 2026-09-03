@@ -96,6 +96,10 @@ jobs:
         env:
           ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
         run: |
+          # A pipe to tee reports tee's exit code, not the test run's, so without this a failing
+          # test in this step is invisible - which is what happened, and how the harness bug above
+          # reached a green check.
+          set -o pipefail
           if [ ! -f "$ROEFACTURA_VALIDATOR_HOME/ROeFacturaValidator.jar" ]; then
             echo "::error::ANAF validator missing; the CIUS-RO oracle tests would have been skipped"
             exit 1
@@ -113,8 +117,10 @@ jobs:
         env:
           EFACTURA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=efactura_test;Username=efactura;Password=efactura-ci"
         run: |
+          set -o pipefail
           dotnet test tests/RomaniaEFactura.Tests --no-build --configuration Release \
-            --filter "FullyQualifiedName~PostgreSqlPersistenceTests" --verbosity normal | tee postgres.txt
+            --filter "FullyQualifiedName~PostgreSqlPersistenceTests|FullyQualifiedName~ExistingDatabaseTests" \
+            --verbosity normal | tee postgres.txt
           if grep -qE "Skipped:[[:space:]]*[1-9]" postgres.txt; then
             echo "::error::PostgreSQL persistence tests were skipped"
             exit 1
@@ -122,6 +128,7 @@ jobs:
 
       - name: Fail on vulnerable packages
         run: |
+          set -o pipefail
           dotnet list RomaniaEFacturaSolution.sln package --vulnerable --include-transitive \
             | tee vulnerable.txt
           if grep -q "has the following vulnerable packages" vulnerable.txt; then

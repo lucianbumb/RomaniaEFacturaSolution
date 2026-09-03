@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using RomaniaEFactura.Authentication;
 using RomaniaEFactura.Persistence;
 using RomaniaEFactura.Transport;
@@ -45,7 +47,12 @@ public sealed class PostgreSqlPersistenceTests : IAsyncLifetime
         if (!PostgreSql.IsConfigured) return;
 
         _db = CreateContext();
-        await _db.Database.EnsureCreatedAsync();
+
+        // Not EnsureCreatedAsync. It creates nothing once the database exists, and the CI database
+        // does - so the first test to run created its schema and the rest silently got none. It
+        // passed on a fresh run and failed on a re-run, which is exactly how it was found.
+        await _db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{_schema}\";");
+        await ((RelationalDatabaseCreator)_db.GetService<IDatabaseCreator>()).CreateTablesAsync();
     }
 
     public async Task DisposeAsync()

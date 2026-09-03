@@ -39,7 +39,9 @@ implies it works for everyone.
 Two ways to get the schema:
 
 **Let the library create it.** `EnsureEFacturaSchemaAsync` creates the tables directly when no
-migrations exist, and applies them when they do. Safe to call on every start.
+migrations exist, and applies them when they do. Safe to call on every start, and safe against a
+database that already holds an application's own tables — it asks whether *its* tables are there,
+not whether the database is empty.
 
 ```csharp
 await app.Services.EnsureEFacturaSchemaAsync();
