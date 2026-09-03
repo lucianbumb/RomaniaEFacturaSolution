@@ -20,6 +20,31 @@ public class InvoicePage(IRomaniaEFacturaService efactura)
 }
 ```
 
+## What validation costs
+
+Measured on a 200-line invoice, Release build:
+
+| Stage | Time | Allocated |
+|---|---|---|
+| DataAnnotations walk | 2.7 ms | 1.8 MB |
+| Mapping to UBL | 0.6 ms | 0.3 MB |
+| CIUS-RO rules | 0.3 ms | 0.1 MB |
+
+The CIUS-RO engine — the part that looks expensive — is the cheapest of the three. Nearly all the
+cost is `Validator.TryValidateObject`, which reaches for `TypeDescriptor` and allocates
+accordingly. That is the price of DataAnnotations parity: the same attributes drive ASP.NET model
+binding and Blazor's `EditForm`, and reimplementing their evaluation to save allocations would risk
+diverging from what a consumer's other validation does.
+
+The walk caches each type's walkable properties, which is what took the first stage from 4.9 ms to
+2.7 ms. What remains is inside the framework.
+
+`<EFacturaValidator />` revalidates the whole document on **every field change**, deliberately:
+almost every rule here is a cross-field one — a total against its lines, an exemption reason
+against a VAT category — so validating one field in isolation would leave stale messages on the
+fields it affects. On a very large invoice that is a few milliseconds per keystroke, and correct
+messages are worth more than those milliseconds.
+
 ## What you do not fill in
 
 Nothing in the model asks for a total, a VAT amount, or a line net amount. EN16931 requires all of

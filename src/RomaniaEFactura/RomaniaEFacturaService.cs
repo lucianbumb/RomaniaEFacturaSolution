@@ -274,11 +274,24 @@ public sealed class RomaniaEFacturaService(
             .ConfigureAwait(false);
         if (!listing.IsSuccess) return listing.CarryError<InboxSyncResult>();
 
-        var known = await db.InboxMessages
-            .Where(m => m.Cif == company)
-            .Select(m => m.DownloadId)
-            .ToHashSetAsync(cancellationToken)
-            .ConfigureAwait(false);
+        // Only the identifiers in this listing, not every one the company has ever had. The
+        // question is "have I seen these twenty", and asking it as "give me all of them" pulls
+        // tens of thousands of strings out of the database for an account with any history - once
+        // per sync, which the background sweep now runs for every company on a schedule.
+        var listed = listing.Value.Messages
+            .Select(m => m.Id)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var known = listed.Count == 0
+            ? []
+            : await db.InboxMessages
+                .Where(m => m.Cif == company && listed.Contains(m.DownloadId))
+                .Select(m => m.DownloadId)
+                .ToHashSetAsync(cancellationToken)
+                .ConfigureAwait(false);
 
         var added = 0;
         var seen = 0;
@@ -296,6 +309,18 @@ public sealed class RomaniaEFacturaService(
                 if (!resolved.IsSuccess || resolved.Value.DownloadId is null) continue;
 
                 downloadId = resolved.Value.DownloadId;
+
+                // The bounded pre-query above could only ask about identifiers the listing already
+                // carried, and this one was not among them - it only became known a line ago. So
+                // this message needs its own check, or a second sync would insert it again and
+                // collide on the primary key.
+                if (!known.Contains(downloadId)
+                    && await db.InboxMessages
+                        .AnyAsync(m => m.Cif == company && m.DownloadId == downloadId, cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    known.Add(downloadId);
+                }
             }
 
             if (known.Contains(downloadId))
