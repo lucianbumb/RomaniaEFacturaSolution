@@ -23,6 +23,24 @@ jobs:
     # are repository-scoped to another repository and cannot serve this one.
     runs-on: ubuntu-latest
 
+    # The library's persistence is exercised against SQLite everywhere else. The first application
+    # to adopt it runs PostgreSQL, and Npgsql is strict about things SQLite is not - it refuses a
+    # DateTime whose kind is not UTC, which is exactly what the context's converter produces.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: efactura
+          POSTGRES_PASSWORD: efactura-ci
+          POSTGRES_DB: efactura_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -69,6 +87,7 @@ jobs:
       - name: Test
         env:
           ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
+          EFACTURA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=efactura_test;Username=efactura;Password=efactura-ci"
         run: dotnet test RomaniaEFacturaSolution.sln --no-build --configuration Release --verbosity normal
 
       # The oracle tests skip silently when the validator is missing, which would quietly turn the
@@ -85,6 +104,19 @@ jobs:
             --filter "FullyQualifiedName~Oracle" --verbosity normal | tee oracle.txt
           if grep -qE "Skipped:[[:space:]]*[1-9]" oracle.txt; then
             echo "::error::CIUS-RO oracle tests were skipped"
+            exit 1
+          fi
+
+      # Same reasoning as the oracle: these skip silently without a server, which would turn
+      # "tested on PostgreSQL" into a claim nothing checks.
+      - name: Assert the PostgreSQL tests actually ran
+        env:
+          EFACTURA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=efactura_test;Username=efactura;Password=efactura-ci"
+        run: |
+          dotnet test tests/RomaniaEFactura.Tests --no-build --configuration Release \
+            --filter "FullyQualifiedName~PostgreSqlPersistenceTests" --verbosity normal | tee postgres.txt
+          if grep -qE "Skipped:[[:space:]]*[1-9]" postgres.txt; then
+            echo "::error::PostgreSQL persistence tests were skipped"
             exit 1
           fi
 
