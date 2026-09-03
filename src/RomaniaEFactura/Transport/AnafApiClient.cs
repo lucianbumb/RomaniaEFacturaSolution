@@ -36,18 +36,29 @@ public sealed class AnafApiClient : IAnafApiClient
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAnafAccessTokenProvider _tokenProvider;
     private readonly EFacturaOptions _options;
+    private readonly IEFacturaCompanyProvider? _companyProvider;
     private readonly ILogger<AnafApiClient> _logger;
 
     /// <summary>Creates the client.</summary>
+    /// <param name="httpClientFactory">Supplies the typed client.</param>
+    /// <param name="tokenProvider">Supplies the access token for a company.</param>
+    /// <param name="options">The configuration.</param>
+    /// <param name="logger">The log.</param>
+    /// <param name="companyProvider">
+    /// Names the company for the current scope when a call does not. Optional: a single-company
+    /// deployment configures <see cref="EFacturaOptions.Cif"/> instead.
+    /// </param>
     public AnafApiClient(
         IHttpClientFactory httpClientFactory,
         IAnafAccessTokenProvider tokenProvider,
         IOptions<EFacturaOptions> options,
-        ILogger<AnafApiClient> logger)
+        ILogger<AnafApiClient> logger,
+        IEFacturaCompanyProvider? companyProvider = null)
     {
         _httpClientFactory = httpClientFactory;
         _tokenProvider = tokenProvider;
         _options = options.Value;
+        _companyProvider = companyProvider;
         _logger = logger;
     }
 
@@ -577,13 +588,12 @@ public sealed class AnafApiClient : IAnafApiClient
     /// </remarks>
     private string ResolveCif(string? cif)
     {
-        var supplied = string.IsNullOrWhiteSpace(cif) ? _options.Cif : cif;
+        var supplied = CompanyResolution.Resolve(cif, _companyProvider, _options);
         var resolved = RomanianCif.Normalize(supplied);
 
         if (string.IsNullOrEmpty(resolved))
         {
-            throw new InvalidOperationException(
-                "No CIF was supplied and none is configured. Set EFacturaOptions.Cif or pass one per call.");
+            throw new InvalidOperationException(CompanyResolution.NothingToResolveMessage);
         }
 
         if (!RomanianCif.IsValid(resolved))

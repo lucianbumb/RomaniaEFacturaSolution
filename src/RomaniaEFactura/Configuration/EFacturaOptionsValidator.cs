@@ -51,6 +51,17 @@ internal sealed class EFacturaOptionsValidator : IValidateOptions<EFacturaOption
                 + "digit does not match.");
         }
 
+        foreach (var origin in options.AllowedReturnOrigins ?? [])
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var parsed) || !IsSecureOrLoopback(parsed))
+            {
+                failures.Add(
+                    $"EFactura:AllowedReturnOrigins entry '{origin}' must be an absolute https origin, "
+                    + "or an http one on a loopback host. A person is redirected there after "
+                    + "authorizing, so it is worth being exact about where.");
+            }
+        }
+
         ValidateBaseAddress(options.ApiBaseAddress, nameof(EFacturaOptions.ApiBaseAddress), failures);
         ValidateBaseAddress(options.OAuthBaseAddress, nameof(EFacturaOptions.OAuthBaseAddress), failures);
 

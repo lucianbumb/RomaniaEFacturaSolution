@@ -87,6 +87,10 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddSingleton<OAuthStateProtector>();
+
+        // Only the configured company unless the host says otherwise. An application serving
+        // several registers its own, which is the only way it can know who may act for whom.
+        services.TryAddSingleton<IEFacturaConnectAuthorizer, ConfiguredCompanyConnectAuthorizer>();
         services.AddScoped<IAnafOAuthClient, AnafOAuthClient>();
         services.AddScoped<IAnafAccessTokenProvider, StoredTokenAccessTokenProvider>();
         services.AddScoped<IAnafApiClient, AnafApiClient>();

@@ -20,7 +20,8 @@ public sealed class RomaniaEFacturaService(
     EFacturaDbContext db,
     IOptions<EFacturaOptions> options,
     TimeProvider time,
-    ILogger<RomaniaEFacturaService> logger) : IRomaniaEFacturaService
+    ILogger<RomaniaEFacturaService> logger,
+    IEFacturaCompanyProvider? companyProvider = null) : IRomaniaEFacturaService
 {
     private readonly EFacturaOptions _options = options.Value;
 
@@ -448,11 +449,10 @@ public sealed class RomaniaEFacturaService(
 
     private string ResolveCif(string? cif)
     {
-        var resolved = RomanianCif.Normalize(string.IsNullOrWhiteSpace(cif) ? _options.Cif : cif);
+        var resolved = RomanianCif.Normalize(CompanyResolution.Resolve(cif, companyProvider, _options));
 
         return string.IsNullOrEmpty(resolved)
-            ? throw new InvalidOperationException(
-                "No CIF was supplied and none is configured. Set EFacturaOptions.Cif or pass one per call.")
+            ? throw new InvalidOperationException(CompanyResolution.NothingToResolveMessage)
             : resolved;
     }
 }
