@@ -23,6 +23,20 @@ Arithmetic rules are **unrepresentable rather than merely detected**. You enter 
 prices; the model derives line net amounts, the seven document totals and the VAT breakdown, so
 `BR-CO-10` through `BR-CO-16` cannot be failed.
 
+## Installing
+
+Prerelease builds are published to **GitHub Packages** from a tag. nuget.org waits for the live
+ANAF run ([#10](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/10)), because that is
+what proves the mock server is faithful.
+
+```powershell
+dotnet add package RomaniaEFacturaLibrary --version 3.0.0-alpha.1
+```
+
+GitHub Packages needs a classic PAT with `read:packages` to restore, even for a public package —
+[docs/publishing.md](docs/publishing.md) has the `NuGet.config`, including the package source
+mapping that stops a hiccup there from failing an unrelated nuget.org restore.
+
 ## Getting started
 
 ```csharp
@@ -263,6 +277,7 @@ your own migrations if you generated them. See [docs/persistence.md](docs/persis
 | `docs/multi-tenancy.md` | Serving several companies from one deployment |
 | `docs/security.md` | What the library protects, what the host application owns, and why |
 | `docs/persistence.md` | The library's own tables, providers tested, and migrations |
+| `docs/publishing.md` | Cutting a release, and the `NuGet.config` a consumer needs |
 | `docs/anaf-wire-formats.md` | How the ANAF API actually behaves. Read this before changing transport code |
 | `docs/live-run.md` | Running against ANAF's real test environment — needs credentials and a certificate |
 | `documentation_efactura/` | ANAF's own published specifications |

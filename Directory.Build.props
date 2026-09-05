@@ -1,0 +1,27 @@
+<Project>
+
+  <!--
+    The one place the package version is stated.
+
+    It was duplicated in both csproj files, and AbstractionsDependencyTests asserts they agree
+    because a consumer taking a mismatched pair gets a binding failure rather than a useful error.
+    A release tag would have been a third copy of the same fact; the release workflow reads this
+    file and refuses a tag that disagrees with it.
+  -->
+  <PropertyGroup>
+    <VersionPrefix>3.0.0</VersionPrefix>
+    <VersionSuffix>alpha.1</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      The PDB goes inside the assembly rather than into a separate symbol package. GitHub Packages
+      does not serve .snupkg, so publishing one there means shipping a file nothing can read;
+      embedded symbols debug without a symbol server at the cost of a slightly larger assembly.
+    -->
+    <DebugType>embedded</DebugType>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+</Project>
