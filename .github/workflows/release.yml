@@ -1,0 +1,241 @@
+name: Release
+
+# Cut a release by tagging the commit you want published:
+#
+#     git tag v3.0.0-alpha.2 && git push origin v3.0.0-alpha.2
+#
+# The tag must agree with the version in Directory.Build.props, or this refuses to publish rather
+# than shipping a mislabelled package. Run it with workflow_dispatch first to pack and check
+# everything without pushing.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack and verify, but do not push'
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Pack and publish
+    # GitHub-hosted, and not negotiable: a release must not depend on this workstation being awake,
+    # and a hosted run is the only proof the packages build on a clean machine. A self-hosted runner
+    # never gets a fresh VM, so state from a previous job can produce a green that means less than
+    # it appears to.
+    runs-on: ubuntu-latest
+
+    # The same gate CI runs. Publishing something CI would have rejected is the one failure mode a
+    # release workflow must not have, so the tests run here too rather than being trusted from an
+    # earlier run on the same commit.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: efactura
+          POSTGRES_PASSWORD: efactura-ci
+          POSTGRES_DB: efactura_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ---------------------------------------------------------------- version
+
+      - name: Read the version, and check the tag agrees with it
+        id: version
+        run: |
+          set -euo pipefail
+
+          prefix=$(grep -oPm1 '(?<=<VersionPrefix>)[^<]+' Directory.Build.props)
+          suffix=$(grep -oPm1 '(?<=<VersionSuffix>)[^<]*' Directory.Build.props || true)
+
+          if [ -n "$suffix" ]; then version="$prefix-$suffix"; else version="$prefix"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Directory.Build.props says $version"
+
+          # A tag run has to match. A manual run has no tag to match against, which is why it
+          # defaults to a dry run.
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tagged="${GITHUB_REF_NAME#v}"
+            if [ "$tagged" != "$version" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match Directory.Build.props ($version). \
+          Publishing would produce a package whose version contradicts its tag."
+              exit 1
+            fi
+            echo "Tag ${GITHUB_REF_NAME} agrees."
+          fi
+
+      # ------------------------------------------------------------------ gate
+
+      - name: Cache ANAF validator
+        id: cache-validator
+        uses: actions/cache@v4
+        with:
+          path: tools/roefacturavalidator
+          key: roefacturavalidator-12122024
+
+      - name: Download ANAF validator
+        if: steps.cache-validator.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p tools
+          curl -sSfL --retry 3 \
+            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36" \
+            -o validator.zip \
+            https://mfinante.gov.ro/static/10/eFactura/roefacturavalidator_12122024.zip
+          unzip -q validator.zip -d tools/roefacturavalidator
+          if [ ! -f tools/roefacturavalidator/ROeFacturaValidator.jar ]; then
+            inner=$(dirname "$(find tools/roefacturavalidator -name ROeFacturaValidator.jar | head -1)")
+            mv "$inner"/* tools/roefacturavalidator/
+          fi
+
+      - name: Restore
+        run: dotnet restore RomaniaEFacturaSolution.sln
+
+      - name: Build
+        run: |
+          dotnet build RomaniaEFacturaSolution.sln --no-restore --configuration Release \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        env:
+          ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
+          EFACTURA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=efactura_test;Username=efactura;Password=efactura-ci"
+        run: dotnet test RomaniaEFacturaSolution.sln --no-build --configuration Release --verbosity normal
+
+      # The oracle and the PostgreSQL tests both skip silently when their dependency is absent,
+      # which would turn the claims this library rests on into no-ops - and a release is the worst
+      # place for that to happen unnoticed.
+      - name: Assert nothing that matters was skipped
+        env:
+          ROEFACTURA_VALIDATOR_HOME: ${{ github.workspace }}/tools/roefacturavalidator
+          EFACTURA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=efactura_test;Username=efactura;Password=efactura-ci"
+        run: |
+          set -o pipefail
+          if [ ! -f "$ROEFACTURA_VALIDATOR_HOME/ROeFacturaValidator.jar" ]; then
+            echo "::error::ANAF validator missing; the CIUS-RO oracle tests would have been skipped"
+            exit 1
+          fi
+          dotnet test tests/RomaniaEFactura.Tests --no-build --configuration Release \
+            --filter "FullyQualifiedName~Oracle|FullyQualifiedName~PostgreSqlPersistenceTests|FullyQualifiedName~ExistingDatabaseTests" \
+            --verbosity normal | tee gate.txt
+          if grep -qE "Skipped:[[:space:]]*[1-9]" gate.txt; then
+            echo "::error::Oracle or PostgreSQL tests were skipped; refusing to publish"
+            exit 1
+          fi
+
+      - name: Fail on vulnerable packages
+        run: |
+          set -o pipefail
+          dotnet list RomaniaEFacturaSolution.sln package --vulnerable --include-transitive \
+            | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::Vulnerable package references found"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------ pack
+
+      - name: Pack
+        run: |
+          dotnet pack src/RomaniaEFactura.Abstractions --no-build --configuration Release \
+            -p:ContinuousIntegrationBuild=true --output artifacts
+          dotnet pack src/RomaniaEFactura --no-build --configuration Release \
+            -p:ContinuousIntegrationBuild=true --output artifacts
+          ls -la artifacts
+
+      # AbstractionsDependencyTests checks the project file and the compiled assembly. This checks
+      # the thing a consumer actually installs, which is neither of those: a package can declare a
+      # dependency the assembly never uses, and that is exactly what lands in their graph.
+      - name: Assert the contracts package ships no infrastructure dependency
+        run: |
+          set -euo pipefail
+
+          nuspec=$(unzip -p artifacts/RomaniaEFacturaLibrary.Abstractions.*.nupkg '*.nuspec')
+          echo "$nuspec" | sed -n '/<dependencies>/,/<\/dependencies>/p'
+
+          if echo "$nuspec" | grep -qE 'dependency id="(Microsoft\.(AspNetCore|EntityFrameworkCore|Extensions)|Npgsql)'; then
+            echo "::error::RomaniaEFacturaLibrary.Abstractions declares an infrastructure dependency. \
+          The package exists so an application layer can reference the contracts without taking on \
+          HTTP or persistence; shipping one breaks that for every consumer."
+            exit 1
+          fi
+
+      - name: Assert both packages carry the tagged version
+        run: |
+          set -euo pipefail
+          expected="${{ steps.version.outputs.version }}"
+
+          for id in RomaniaEFacturaLibrary RomaniaEFacturaLibrary.Abstractions; do
+            if [ ! -f "artifacts/$id.$expected.nupkg" ]; then
+              echo "::error::Expected artifacts/$id.$expected.nupkg; found: $(ls artifacts)"
+              exit 1
+            fi
+          done
+
+          echo "Both packages are $expected."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+      # ------------------------------------------------------------------ push
+
+      - name: Publish to GitHub Packages
+        if: github.event_name == 'push' || inputs.dry_run == false
+        run: |
+          set -euo pipefail
+
+          # GITHUB_TOKEN is enough to publish into this repository's own registry; consuming from
+          # elsewhere needs a classic PAT with read:packages, which docs/publishing.md explains.
+          dotnet nuget push 'artifacts/*.nupkg' \
+            --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
+
+      - name: Summary
+        run: |
+          {
+            echo "### ${{ steps.version.outputs.version }}"
+            echo
+            if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.dry_run }}" = "false" ]; then
+              echo "Published to GitHub Packages."
+            else
+              echo "Dry run: packed and verified, nothing pushed."
+            fi
+            echo
+            echo '```'
+            ls -1 artifacts
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
