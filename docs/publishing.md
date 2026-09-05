@@ -18,14 +18,14 @@ The version lives in one place, `Directory.Build.props`:
 
 ```xml
 <VersionPrefix>3.0.0</VersionPrefix>
-<VersionSuffix>alpha.1</VersionSuffix>
+<VersionSuffix>alpha.2</VersionSuffix>
 ```
 
 Bump it, merge that, then tag the commit:
 
 ```powershell
-git tag v3.0.0-alpha.2
-git push origin v3.0.0-alpha.2
+git tag v3.0.0-alpha.3
+git push origin v3.0.0-alpha.3
 ```
 
 **The tag must agree with `Directory.Build.props`.** If it does not, the workflow stops before
@@ -111,7 +111,7 @@ $env:GITHUB_PACKAGES_TOKEN = "<classic PAT with read:packages>"
 These are prereleases, so they need an explicit version or `--prerelease`:
 
 ```powershell
-dotnet add package RomaniaEFacturaLibrary --version 3.0.0-alpha.1
+dotnet add package RomaniaEFacturaLibrary --version 3.0.0-alpha.2
 ```
 
 Reference `RomaniaEFacturaLibrary` and you get `Abstractions` with it. Reference `Abstractions`

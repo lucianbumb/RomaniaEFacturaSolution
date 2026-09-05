@@ -30,7 +30,7 @@ ANAF run ([#10](https://github.com/lucianbumb/RomaniaEFacturaSolution/issues/10)
 what proves the mock server is faithful.
 
 ```powershell
-dotnet add package RomaniaEFacturaLibrary --version 3.0.0-alpha.1
+dotnet add package RomaniaEFacturaLibrary --version 3.0.0-alpha.2
 ```
 
 GitHub Packages needs a classic PAT with `read:packages` to restore, even for a public package —
